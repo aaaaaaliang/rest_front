@@ -50,6 +50,24 @@ const routes = [
         name: 'SalaryManagement',
         component: () => import('../views/admin/SalaryManagement.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'customer-service',
+        name: 'CustomerServiceManagement',
+        component: () => import('../views/admin/CustomerServiceManagement.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'system',
+        name: 'SystemConfig',
+        component: () => import('../views/admin/SystemConfig.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'images',
+        name: 'ImageManagement',
+        component: () => import('../views/admin/ImageManagement.vue'),
+        meta: { requiresAuth: true }
       }
     ]
   },

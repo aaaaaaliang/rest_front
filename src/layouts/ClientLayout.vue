@@ -20,6 +20,28 @@
           </el-badge>
         </router-link>
         
+        <el-dropdown class="theme-dropdown" trigger="click">
+          <el-button plain>
+            <el-icon><Brush /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="switchTheme('light')">
+                <el-icon><Sunny /></el-icon>
+                <span>浅色模式</span>
+              </el-dropdown-item>
+              <el-dropdown-item @click="switchTheme('dark')">
+                <el-icon><Moon /></el-icon>
+                <span>深色模式</span>
+              </el-dropdown-item>
+              <el-dropdown-item @click="switchTheme('auto')">
+                <el-icon><Monitor /></el-icon>
+                <span>跟随系统</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        
         <template v-if="isLoggedIn">
           <el-dropdown>
             <span class="user-dropdown">
@@ -53,6 +75,7 @@
     <el-footer class="footer">
       <p>© 2024 餐厅点餐系统 版权所有</p>
     </el-footer>
+    <customer-service />
   </div>
 </template>
 
@@ -60,10 +83,14 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '../stores/cart'
+import { useThemeStore } from '../stores/theme'
+import { Sunny, Moon, Monitor, Brush } from '@element-plus/icons-vue'
+import CustomerService from '../components/CustomerService.vue'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
+const themeStore = useThemeStore()
 
 const activeMenu = computed(() => route.path)
 const cartCount = computed(() => cartStore.totalCount)
@@ -76,6 +103,15 @@ const handleLogout = () => {
   localStorage.removeItem('token')
   router.push('/login')
 }
+
+// 切换主题
+const switchTheme = (mode) => {
+  themeStore.setTheme({
+    ...themeStore.$state,
+    mode
+  })
+  localStorage.setItem('theme', JSON.stringify(themeStore.$state))
+}
 </script>
 
 <style scoped>
@@ -83,6 +119,7 @@ const handleLogout = () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-color);
 }
 
 .header {
@@ -91,6 +128,8 @@ const handleLogout = () => {
   justify-content: space-between;
   padding: 0 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
 }
 
 .logo {
@@ -120,7 +159,18 @@ const handleLogout = () => {
 .footer {
   margin-top: auto;
   text-align: center;
-  background-color: #f5f5f5;
+  background-color: var(--card-bg);
   padding: 20px 0;
+  color: var(--text-color-secondary);
+}
+
+.theme-dropdown {
+  margin-right: 20px;
+}
+
+.el-dropdown-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style> 

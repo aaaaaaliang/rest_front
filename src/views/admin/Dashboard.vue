@@ -115,6 +115,7 @@
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import * as echarts from 'echarts'
+import { useChartTheme } from '../../hooks/useChartTheme'
 
 const statistics = reactive({
   todayOrders: 156,
@@ -126,12 +127,15 @@ const statistics = reactive({
 const revenueChartRef = ref(null)
 const dishesChartRef = ref(null)
 
+const { chartTheme } = useChartTheme()
+
 onMounted(() => {
   const revenueChart = echarts.init(revenueChartRef.value)
   const dishesChart = echarts.init(dishesChartRef.value)
   
   // 营收趋势图配置
   revenueChart.setOption({
+    ...chartTheme.value,
     title: {
       text: '近7天营收趋势'
     },
@@ -154,6 +158,7 @@ onMounted(() => {
   
   // 热销菜品排行图配置
   dishesChart.setOption({
+    ...chartTheme.value,
     title: {
       text: '热销菜品TOP5'
     },
@@ -186,19 +191,25 @@ onMounted(() => {
 <style scoped>
 .dashboard {
   padding: 20px;
-}
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+  .el-card {
+    background-color: var(--card-bg);
+  }
 
-.card-content {
-  text-align: center;
-}
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 
-.chart-container {
-  margin-top: 20px;
+  .card-content {
+    text-align: center;
+    color: var(--text-color);
+  }
+
+  .chart-container {
+    margin-top: 20px;
+    background-color: var(--card-bg);
+  }
 }
 </style> 

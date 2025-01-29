@@ -85,6 +85,17 @@
             />
           </template>
         </el-table-column>
+        <el-table-column prop="stock" label="库存" width="120">
+          <template #default="scope">
+            <el-input-number 
+              v-model="scope.row.stock" 
+              :min="0"
+              :max="999"
+              size="small"
+              @change="handleStockChange(scope.row)"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200">
           <template #default="scope">
             <el-button size="small" @click="handleEditDish(scope.row)">
@@ -183,6 +194,14 @@
             :rows="3"
           />
         </el-form-item>
+        <el-form-item label="库存数量" prop="stock">
+          <el-input-number
+            v-model="dishForm.stock"
+            :min="0"
+            :max="999"
+            style="width: 100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -265,7 +284,8 @@ const dishForm = reactive({
   categoryId: '',
   price: 0,
   image: '',
-  description: ''
+  description: '',
+  stock: 0
 })
 
 const categoryRules = {
@@ -371,6 +391,11 @@ const handleDeleteDish = (dish) => {
 const handleStatusChange = (dish) => {
   // TODO: 调用状态更新API
   ElMessage.success(`菜品${dish.name}状态已${dish.status === 1 ? '上架' : '下架'}`)
+}
+
+const handleStockChange = (dish) => {
+  // TODO: 调用库存更新API
+  ElMessage.success(`菜品${dish.name}库存已更新为${dish.stock}`)
 }
 
 const handleSubmitDish = async () => {

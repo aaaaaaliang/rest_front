@@ -85,6 +85,44 @@
             </el-form-item>
           </el-form>
         </el-card>
+
+        <!-- 主题设置卡片 -->
+        <el-card class="theme-section">
+          <template #header>
+            <div class="card-header">
+              <span>主题设置</span>
+            </div>
+          </template>
+          
+          <div class="theme-options">
+            <div 
+              class="theme-option"
+              :class="{ active: currentTheme === 'light' }"
+              @click="switchTheme('light')"
+            >
+              <el-icon class="theme-icon"><Sunny /></el-icon>
+              <div class="theme-label">浅色模式</div>
+            </div>
+            
+            <div 
+              class="theme-option"
+              :class="{ active: currentTheme === 'dark' }"
+              @click="switchTheme('dark')"
+            >
+              <el-icon class="theme-icon"><Moon /></el-icon>
+              <div class="theme-label">深色模式</div>
+            </div>
+            
+            <div 
+              class="theme-option"
+              :class="{ active: currentTheme === 'auto' }"
+              @click="switchTheme('auto')"
+            >
+              <el-icon class="theme-icon"><Monitor /></el-icon>
+              <div class="theme-label">跟随系统</div>
+            </div>
+          </div>
+        </el-card>
       </el-col>
 
       <!-- 右侧常用地址 -->
@@ -246,8 +284,10 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useThemeStore } from '../../stores/theme'
+import { Sunny, Moon, Monitor } from '@element-plus/icons-vue'
 
 // 用户信息数据
 const userInfo = ref({
@@ -491,11 +531,77 @@ const handleChangePassword = async () => {
     }
   })
 }
+
+const themeStore = useThemeStore()
+
+const currentTheme = computed(() => themeStore.mode)
+
+const switchTheme = (mode) => {
+  themeStore.setTheme({
+    ...themeStore.$state,
+    mode
+  })
+  localStorage.setItem('theme', JSON.stringify(themeStore.$state))
+}
 </script>
 
 <style scoped>
 .profile {
   padding: 20px;
+  
+  .el-card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+  }
+  
+  .info-item {
+    color: var(--text-color);
+  }
+  
+  .section-title {
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .avatar-upload {
+    border-color: var(--border-color);
+  }
+  
+  .upload-tip {
+    color: var(--text-color-secondary);
+  }
+}
+
+.theme-section {
+  margin-top: 20px;
+  
+  .theme-options {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  
+  .theme-option {
+    padding: 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    
+    &.active {
+      border-color: var(--el-color-primary);
+      background-color: var(--hover-bg);
+    }
+    
+    .theme-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    
+    .theme-label {
+      color: var(--text-color);
+    }
+  }
 }
 
 .card-header {
