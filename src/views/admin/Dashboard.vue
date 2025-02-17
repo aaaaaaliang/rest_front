@@ -20,7 +20,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="6">
         <el-card shadow="hover">
           <template #header>
@@ -40,7 +40,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="6">
         <el-card shadow="hover">
           <template #header>
@@ -60,7 +60,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="6">
         <el-card shadow="hover">
           <template #header>
@@ -69,7 +69,8 @@
             </div>
           </template>
           <div class="card-content">
-            <el-statistic :value="statistics.hotDishes">
+              <el-statistic :value="statistics.hotDishes?.length || 0">
+
               <template #title>
                 <div style="display: inline-flex; align-items: center">
                   销量
@@ -95,7 +96,7 @@
           </div>
         </el-card>
       </el-col>
-      
+
       <el-col :span="12">
         <el-card shadow="hover">
           <template #header>
@@ -116,12 +117,15 @@
 import { ref, onMounted, reactive } from 'vue'
 import * as echarts from 'echarts'
 import { useChartTheme } from '../../hooks/useChartTheme'
+import request from '../../utils/request'
+import { API } from '../../config/api'
 
 const statistics = reactive({
-  todayOrders: 156,
-  todayRevenue: 8234.50,
-  newUsers: 24,
-  hotDishes: 389
+  todayOrders: 0,
+  todayRevenue: 0,
+  newUsers: 0,
+  hotDishes: [],
+  dailySales: {}
 })
 
 const revenueChartRef = ref(null)
@@ -129,10 +133,36 @@ const dishesChartRef = ref(null)
 
 const { chartTheme } = useChartTheme()
 
+// 获取后端数据
 onMounted(() => {
+  request(API.DASHBOARD.LIST)
+      .then(response => {
+        if (response.code === 200) {
+          const data = response.data
+
+          // 更新统计数据
+          statistics.todayOrders = data.orders
+          statistics.todayRevenue = data.total_amount
+          statistics.newUsers = data.users
+          statistics.hotDishes = data.products
+          statistics.dailySales = data.daily_sales
+
+          // 更新图表
+          updateCharts(data.daily_sales)
+        } else {
+          console.error('请求数据失败', response.message)
+        }
+      })
+      .catch(error => {
+        console.error('请求错误', error)
+      })
+})
+
+// 更新图表
+function updateCharts(dailySales) {
   const revenueChart = echarts.init(revenueChartRef.value)
   const dishesChart = echarts.init(dishesChartRef.value)
-  
+
   // 营收趋势图配置
   revenueChart.setOption({
     ...chartTheme.value,
@@ -144,18 +174,18 @@ onMounted(() => {
     },
     xAxis: {
       type: 'category',
-      data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+      data: Object.keys(dailySales)
     },
     yAxis: {
       type: 'value'
     },
     series: [{
-      data: [5600, 6780, 7800, 8900, 9200, 12000, 8234.5],
+      data: Object.values(dailySales),
       type: 'line',
       smooth: true
     }]
   })
-  
+
   // 热销菜品排行图配置
   dishesChart.setOption({
     ...chartTheme.value,
@@ -171,21 +201,23 @@ onMounted(() => {
     xAxis: {
       type: 'value'
     },
+
     yAxis: {
       type: 'category',
-      data: ['红烧肉', '糖醋排骨', '水煮鱼', '宫保鸡丁', '麻婆豆腐']
+      data: statistics.hotDishes.map(dish => dish.product_name)
     },
     series: [{
       type: 'bar',
-      data: [158, 142, 125, 98, 82]
+      data: statistics.hotDishes.map(dish => dish.quantity)
     }]
   })
-  
+
+  // 监听窗口大小变化
   window.addEventListener('resize', () => {
     revenueChart.resize()
     dishesChart.resize()
   })
-})
+}
 </script>
 
 <style scoped>
@@ -212,4 +244,4 @@ onMounted(() => {
     background-color: var(--card-bg);
   }
 }
-</style> 
+</style>

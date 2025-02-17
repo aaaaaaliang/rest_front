@@ -4,340 +4,275 @@
       <template #header>
         <div class="card-header">
           <div class="header-left">
-            <el-input
-              v-model="searchQuery"
-              placeholder="搜索订单号/用户名"
-              style="width: 200px"
-              clearable
-              @clear="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            
+            <span>订单管理</span>
             <el-select 
-              v-model="statusFilter" 
-              placeholder="订单状态" 
+              v-model="queryParams.status" 
+              placeholder="订单状态"
               clearable
-              style="margin-left: 16px; width: 120px"
               @change="handleSearch"
             >
-              <el-option label="待付款" value="pending" />
-              <el-option label="待接单" value="paid" />
-              <el-option label="制作中" value="processing" />
-              <el-option label="待配送" value="ready" />
-              <el-option label="配送中" value="delivering" />
-              <el-option label="已完成" value="completed" />
-              <el-option label="已取消" value="cancelled" />
+              <el-option
+                v-for="(value, key) in ORDER_STATUS"
+                :key="value"
+                :label="ORDER_STATUS_MAP[value].label"
+                :value="value"
+              />
             </el-select>
-            
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              style="margin-left: 16px; width: 300px"
-              @change="handleSearch"
-            />
           </div>
-          
-          <el-button type="primary" @click="handleSearch">
-            搜索
-          </el-button>
         </div>
       </template>
 
-      <el-table :data="orders" style="width: 100%">
-        <el-table-column prop="id" label="订单号" width="180" />
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="createTime" label="下单时间" width="180" />
-        <el-table-column prop="amount" label="金额">
-          <template #default="scope">
-            ¥{{ scope.row.amount.toFixed(2) }}
+      <!-- 订单列表 -->
+      <el-table 
+        v-loading="loading"
+        :data="orders" 
+        style="width: 100%"
+      >
+        <el-table-column label="订单编号" prop="code" width="200" />
+
+        <el-table-column label="订单详情" min-width="200">
+          <template #default="{ row }">
+            <div class="order-products">
+              <div v-for="item in row.order_detail" :key="item.product_code" class="product-item">
+
+                <div class="product-info">
+                  <div class="product-name">{{ item.product_name }}</div>
+                  <div class="product-meta">
+                    ¥{{ item.price.toFixed(2) }} × {{ item.quantity }}
+                  </div>
+                </div>
+              </div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ getStatusText(scope.row.status) }}
+
+        <el-table-column label="订单创建时间" prop="created" width="200" />
+
+        <el-table-column prop="total_price" label="实付款" width="120" align="center">
+          <template #default="{ row }">
+            <span class="price">¥{{ row.total_price.toFixed(2) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="status" label="订单状态" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="ORDER_STATUS_MAP[row.status].type">
+              {{ ORDER_STATUS_MAP[row.status].label }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250">
-          <template #default="scope">
+
+        <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
+
+        <el-table-column label="操作" width="200" fixed="right" align="center">
+          <template #default="{ row }">
             <el-button 
-              size="small"
-              @click="handleViewDetails(scope.row)"
+              v-if="row.status === ORDER_STATUS.PENDING"
+              type="primary" 
+              link
+              @click="handleUpdateStatus(row, ORDER_STATUS.PROCESSING)"
             >
-              查看详情
+              开始制作
             </el-button>
-            <el-button
-              v-if="scope.row.status === 'paid'"
-              size="small"
-              type="primary"
-              @click="handleAcceptOrder(scope.row)"
-            >
-              接单
-            </el-button>
-            <el-button
-              v-if="scope.row.status === 'processing'"
-              size="small"
-              type="success"
-              @click="handleCompleteOrder(scope.row)"
+            <el-button 
+              v-if="row.status === ORDER_STATUS.PROCESSING"
+              type="success" 
+              link
+              @click="handleUpdateStatus(row, ORDER_STATUS.COMPLETED)"
             >
               完成制作
+            </el-button>
+            <el-button 
+              v-if="row.status === ORDER_STATUS.PENDING"
+              type="danger" 
+              link
+              @click="handleUpdateStatus(row, ORDER_STATUS.FAILED)"
+            >
+              无法处理
+            </el-button>
+            <el-button 
+              type="primary" 
+              link
+              @click="handleEdit(row)"
+            >
+              编辑
             </el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <div class="pagination-container">
+      <!-- 分页 -->
+      <div class="pagination">
         <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          v-model:current-page="queryParams.index"
+          v-model:page-size="queryParams.size"
           :total="total"
+          :page-sizes="[10, 20, 30]"
           layout="total, sizes, prev, pager, next"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
       </div>
-    </el-card>
 
-    <!-- 订单详情对话框 -->
-    <el-dialog
-      v-model="detailsDialogVisible"
-      title="订单详情"
-      width="700px"
-    >
-      <template v-if="currentOrder">
-        <div class="order-info">
-          <div class="info-item">
-            <span class="label">订单号：</span>
-            <span>{{ currentOrder.id }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">下单时间：</span>
-            <span>{{ currentOrder.createTime }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">用户名：</span>
-            <span>{{ currentOrder.username }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">联系电话：</span>
-            <span>{{ currentOrder.phone }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">配送地址：</span>
-            <span>{{ currentOrder.address }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">订单状态：</span>
-            <el-tag :type="getStatusType(currentOrder.status)">
-              {{ getStatusText(currentOrder.status) }}
-            </el-tag>
-          </div>
-        </div>
-
-        <el-divider />
-
-        <el-table :data="currentOrder.items" style="width: 100%">
-          <el-table-column label="菜品图片" width="100">
-            <template #default="scope">
-              <el-image
-                style="width: 50px; height: 50px"
-                :src="scope.row.image"
-                :preview-src-list="[scope.row.image]"
+      <!-- 编辑对话框 -->
+      <el-dialog
+        v-model="dialogVisible"
+        :title="'编辑订单'"
+        width="500px"
+      >
+        <el-form
+          ref="formRef"
+          :model="form"
+          :rules="rules"
+          label-width="100px"
+        >
+          <el-form-item label="订单状态" prop="status">
+            <el-select v-model="form.status">
+              <el-option
+                v-for="(value, key) in ORDER_STATUS"
+                :key="value"
+                :label="ORDER_STATUS_MAP[value].label"
+                :value="value"
               />
-            </template>
-          </el-table-column>
-          <el-table-column prop="name" label="菜品名称" />
-          <el-table-column prop="price" label="单价">
-            <template #default="scope">
-              ¥{{ scope.row.price.toFixed(2) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="quantity" label="数量" width="100" />
-          <el-table-column label="小计">
-            <template #default="scope">
-              ¥{{ (scope.row.price * scope.row.quantity).toFixed(2) }}
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div class="order-total">
-          <span>订单总额：</span>
-          <span class="amount">¥{{ currentOrder.amount.toFixed(2) }}</span>
-        </div>
-
-        <div class="order-remarks" v-if="currentOrder.remarks">
-          <span class="label">备注：</span>
-          <span>{{ currentOrder.remarks }}</span>
-        </div>
-      </template>
-    </el-dialog>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="备注" prop="remark">
+            <el-input
+              v-model="form.remark"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入备注信息"
+            />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmit">
+            确定
+          </el-button>
+        </template>
+      </el-dialog>
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useOrderStore } from '../../stores/order'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Picture } from '@element-plus/icons-vue'
+import { ORDER_STATUS, ORDER_STATUS_MAP } from '../../config/constants'
+import { IMAGE_SIZE, getImageUrl } from '../../config/constants'
 
-// 搜索条件
-const searchQuery = ref('')
-const statusFilter = ref('')
-const dateRange = ref(null)
+const orderStore = useOrderStore()
+const loading = ref(false)
+const submitting = ref(false)
+const dialogVisible = ref(false)
+const formRef = ref(null)
+const orders = ref([])
+const total = ref(0)
 
-// 分页
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(100)
+// 查询参数
+const queryParams = reactive({
+  index: 1,
+  size: 10,
+  status: ''
+})
 
-// 订单数据
-const orders = ref([
-  {
-    id: 'DD20240101001',
-    username: '张三',
-    createTime: '2024-01-01 12:30:00',
-    amount: 128.00,
-    status: 'paid',
-    phone: '13800138000',
-    address: '北京市朝阳区xxx街道xxx小区',
-    remarks: '不要辣',
-    items: [
-      {
-        name: '宫保鸡丁',
-        price: 38.00,
-        quantity: 2,
-        image: 'https://via.placeholder.com/100'
-      },
-      {
-        name: '白切鸡',
-        price: 52.00,
-        quantity: 1,
-        image: 'https://via.placeholder.com/100'
-      }
-    ]
-  },
-  {
-    id: 'DD20240101002',
-    username: '李四',
-    createTime: '2024-01-01 13:00:00',
-    amount: 156.00,
-    status: 'processing',
-    phone: '13800138001',
-    address: '北京市海淀区xxx街道xxx小区',
-    remarks: '',
-    items: [
-      {
-        name: '水煮鱼',
-        price: 88.00,
-        quantity: 1,
-        image: 'https://via.placeholder.com/100'
-      },
-      {
-        name: '青椒肉丝',
-        price: 34.00,
-        quantity: 2,
-        image: 'https://via.placeholder.com/100'
-      }
-    ]
-  }
-])
+// 表单数据
+const form = ref({
+  code: '',
+  status: '',
+  remark: ''
+})
 
-const detailsDialogVisible = ref(false)
-const currentOrder = ref(null)
-
-// 状态相关方法
-const getStatusType = (status) => {
-  const statusMap = {
-    pending: 'info',
-    paid: 'warning',
-    processing: 'primary',
-    ready: 'success',
-    delivering: 'primary',
-    completed: 'success',
-    cancelled: 'danger'
-  }
-  return statusMap[status]
+// 表单校验规则
+const rules = {
+  status: [{ required: true, message: '请选择订单状态', trigger: 'change' }]
 }
 
-const getStatusText = (status) => {
-  const statusMap = {
-    pending: '待付款',
-    paid: '待接单',
-    processing: '制作中',
-    ready: '待配送',
-    delivering: '配送中',
-    completed: '已完成',
-    cancelled: '已取消'
+// 获取订单列表
+const fetchOrders = async () => {
+  loading.value = true
+  try {
+    await orderStore.fetchOrders(queryParams)
+    orders.value = orderStore.orders
+    total.value = orderStore.total
+  } finally {
+    loading.value = false
   }
-  return statusMap[status]
 }
 
-// 搜索和分页方法
-const handleSearch = () => {
-  // TODO: 实现搜索功能
-  console.log('搜索条件:', {
-    query: searchQuery.value,
-    status: statusFilter.value,
-    dateRange: dateRange.value
+// 处理状态更新
+const handleUpdateStatus = async (order, status) => {
+  try {
+    const success = await orderStore.updateOrder({
+      code: order.code,
+      status
+    })
+    if (success) {
+      fetchOrders()
+    }
+  } catch (error) {
+    // 错误已在 store 中处理
+  }
+}
+
+// 编辑订单
+const handleEdit = (row) => {
+  form.value = {
+    code: row.code,
+    status: row.status,
+    remark: row.remark || ''
+  }
+  dialogVisible.value = true
+}
+
+// 提交表单
+const handleSubmit = async () => {
+  if (!formRef.value) return
+  
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      submitting.value = true
+      try {
+        const success = await orderStore.updateOrder(form.value)
+        if (success) {
+          dialogVisible.value = false
+          fetchOrders()
+        }
+      } finally {
+        submitting.value = false
+      }
+    }
   })
 }
 
+// 处理搜索
+const handleSearch = () => {
+  queryParams.index = 1
+  fetchOrders()
+}
+
+// 处理分页
 const handleSizeChange = (val) => {
-  pageSize.value = val
-  // TODO: 重新加载数据
+  queryParams.size = val
+  queryParams.index = 1
+  fetchOrders()
 }
 
 const handleCurrentChange = (val) => {
-  currentPage.value = val
-  // TODO: 重新加载数据
+  queryParams.index = val
+  fetchOrders()
 }
 
-// 订单操作方法
-const handleViewDetails = (order) => {
-  currentOrder.value = order
-  detailsDialogVisible.value = true
-}
-
-const handleAcceptOrder = (order) => {
-  ElMessageBox.confirm(
-    `确定接受订单 ${order.id} 吗？`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    }
-  ).then(() => {
-    // TODO: 调用接单API
-    order.status = 'processing'
-    ElMessage.success('接单成功')
-  })
-}
-
-const handleCompleteOrder = (order) => {
-  ElMessageBox.confirm(
-    `确定完成订单 ${order.id} 的制作吗？`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    }
-  ).then(() => {
-    // TODO: 调用完成制作API
-    order.status = 'ready'
-    ElMessage.success('已完成制作')
-  })
-}
+// 初始化
+onMounted(() => {
+  fetchOrders()
+})
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .order-management {
   padding: 20px;
 }
@@ -346,54 +281,71 @@ const handleCompleteOrder = (order) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .el-select {
+      width: 150px;
+    }
+  }
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
+.order-products {
+  .product-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid var(--el-border-color-lighter);
+    }
+
+    .product-image {
+      width: 50px;
+      height: 50px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .product-info {
+      flex: 1;
+      min-width: 0;
+
+      .product-name {
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .product-meta {
+        font-size: 13px;
+        color: var(--el-text-color-secondary);
+      }
+    }
+  }
 }
 
-.pagination-container {
+.price {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+
+.pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
 }
 
-.order-info {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.info-item {
+.image-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
-}
-
-.info-item .label {
-  color: #606266;
-  margin-right: 8px;
-}
-
-.order-total {
-  margin-top: 20px;
-  text-align: right;
-  font-size: 16px;
-}
-
-.order-total .amount {
-  color: #f56c6c;
-  font-weight: bold;
-  margin-left: 8px;
-}
-
-.order-remarks {
-  margin-top: 16px;
-  color: #606266;
-}
-
-.order-remarks .label {
-  margin-right: 8px;
+  justify-content: center;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
 }
 </style> 

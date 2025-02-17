@@ -1,109 +1,70 @@
 <template>
   <div class="image-management">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
-            <el-input
-              v-model="searchQuery"
-              placeholder="搜索图片名称"
-              style="width: 300px"
-              clearable
-              @clear="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            
-            <el-select 
-              v-model="categoryFilter" 
-              placeholder="分类" 
-              clearable
-              style="margin-left: 16px; width: 120px"
-              @change="handleSearch"
-            >
-              <el-option 
-                v-for="item in categories"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </div>
-          
-          <el-button type="primary" @click="handleUpload">
-            上传图片
-          </el-button>
-        </div>
-      </template>
+    <div class="tab-header">
+      <el-button type="primary" @click="handleAddBanner">
+        <el-icon><Plus /></el-icon> 添加轮播图
+      </el-button>
+    </div>
 
-      <div class="image-list">
-        <el-row :gutter="20">
-          <el-col 
-            v-for="image in imageList" 
-            :key="image.id" 
-            :span="6"
+    <!-- 轮播图列表 -->
+    <el-table 
+      v-loading="bannerLoading"
+      :data="banners" 
+      style="width: 100%"
+    >
+      <el-table-column label="预览图" width="200">
+        <template #default="{ row }">
+          <el-image
+            :src="row.image"
+            fit="cover"
+            class="banner-image"
+            :preview-src-list="[row.image]"
           >
-            <el-card 
-              :body-style="{ padding: '0px' }" 
-              shadow="hover"
-              class="image-card"
-            >
-              <el-image 
-                :src="image.url" 
-                fit="cover"
-                class="image"
-                :preview-src-list="[image.url]"
-              >
-                <template #error>
-                  <div class="image-error">
-                    <el-icon><Picture /></el-icon>
-                  </div>
-                </template>
-              </el-image>
-              
-              <div class="image-info">
-                <div class="info-content">
-                  <h4>{{ image.name }}</h4>
-                  <p>{{ image.category }}</p>
-                  <p>{{ image.createTime }}</p>
-                </div>
-                
-                <div class="image-actions">
-                  <el-button 
-                    type="primary" 
-                    link
-                    @click="handleCopy(image)"
-                  >
-                    复制链接
-                  </el-button>
-                  <el-button 
-                    type="danger" 
-                    link
-                    @click="handleDelete(image)"
-                  >
-                    删除
-                  </el-button>
-                </div>
+            <template #error>
+              <div class="image-placeholder">
+                <el-icon><Picture /></el-icon>
               </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
+            </template>
+          </el-image>
+        </template>
+      </el-table-column>
 
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[12, 24, 36, 48]"
-          :total="total"
-          layout="total, sizes, prev, pager, next"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
+      <el-table-column prop="title" label="标题" min-width="200" />
+      <!-- <el-table-column prop="code" label="编号" min-width="200" /> -->
+
+      <el-table-column label="操作" width="200" fixed="right" align="center">
+        <template #default="{ row }">
+          <el-button 
+            type="primary" 
+            link
+            @click="handleEditBanner(row)"
+          >
+            编辑
+          </el-button>
+          <el-button 
+            type="danger" 
+            link
+            @click="handleDeleteBanner(row)"
+          >
+            删除
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 轮播图分页 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="bannerQuery.index"
+        v-model:page-size="bannerQuery.size"
+        :total="bannerTotal"
+        :page-sizes="[10, 20, 30]"
+        background
+        layout="total, sizes, prev, pager, next"
+        @size-change="handleBannerSizeChange"
+        @current-change="handleBannerCurrentChange"
+      />
+    </div>
 
     <!-- 上传对话框 -->
     <el-dialog
@@ -156,13 +117,59 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 轮播图编辑对话框 -->
+    <el-dialog
+      v-model="bannerDialogVisible"
+      :title="bannerForm.code ? '编辑轮播图' : '添加轮播图'"
+      width="500px"
+    >
+      <el-form
+        ref="bannerFormRef"
+        :model="bannerForm"
+        :rules="bannerRules"
+        label-width="80px"
+      >
+        <el-form-item label="图片" prop="picture.code">
+          <upload-file
+            v-model="bannerForm.picture.code"
+            accept="image/*"
+            :max-size="5"
+            tip="支持 jpg、png、gif 格式，大小不超过5MB"
+            @success="handleUploadSuccess"
+          />
+        </el-form-item>
+
+        <el-form-item label="标题" prop="title">
+          <el-input v-model="bannerForm.title" placeholder="请输入标题" />
+        </el-form-item>
+
+        <el-form-item label="排序" prop="sort">
+          <el-input-number 
+            v-model="bannerForm.sort" 
+            :min="1" 
+            :max="99"
+            controls-position="right"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="bannerDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmitBanner">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Picture, Plus } from '@element-plus/icons-vue'
+import UploadFile from '../../components/UploadFile.vue'
+import request from '../../utils/request'
+import { API } from '../../config/api'
 
 // 分类选项
 const categories = [
@@ -213,6 +220,150 @@ const uploadRules = {
   ]
 }
 
+// 当前激活的 tab
+const activeTab = ref('banner')
+
+// 轮播图相关
+const bannerLoading = ref(false)
+const submitting = ref(false)
+const bannerDialogVisible = ref(false)
+const bannerFormRef = ref(null)
+const banners = ref([])
+const bannerTotal = ref(0)
+
+// 轮播图查询参数
+const bannerQuery = reactive({
+  index: 1,
+  size: 10,
+  category: undefined
+})
+
+// 轮播图表单数据
+const bannerForm = ref({
+  code: '',
+  picture: {
+    code: '',
+    name: ''
+  },
+  title: '',
+  sort: 1,
+})
+
+// 轮播图表单校验规则
+const bannerRules = {
+  'picture.code': [{ required: true, message: '请上传图片', trigger: 'change' }],
+  title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
+  sort: [{ required: true, message: '请输入排序', trigger: 'blur' }],
+}
+
+// 获取轮播图列表
+const fetchBanners = async () => {
+  bannerLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      index: bannerQuery.index,
+      size: bannerQuery.size,
+      ...(bannerQuery.category !== undefined ? { category: bannerQuery.category } : {})
+    })
+    const res = await request(`${API.BANNER.LIST}?${params}`)
+    banners.value = res.data || []
+    bannerTotal.value = res.total || 0
+  } catch (error) {
+    ElMessage.error('获取轮播图列表失败')
+  } finally {
+    bannerLoading.value = false
+  }
+}
+
+// 添加轮播图
+const handleAddBanner = () => {
+  bannerForm.value = {
+    code: '',
+    picture: {
+      code: '',
+      name: ''
+    },
+    title: '',
+    sort: 1,
+  }
+  bannerDialogVisible.value = true
+}
+
+// 编辑轮播图
+const handleEditBanner = (row) => {
+  bannerForm.value = {
+    code: row.code,
+    picture: {
+      code: row.image,
+      name: ''
+    },
+    title: row.title,
+    sort: row.sort,
+  }
+  bannerDialogVisible.value = true
+}
+
+// 删除轮播图
+const handleDeleteBanner = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个轮播图吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await request(`${API.BANNER.DELETE}?code=${row.code}`, {
+      method: 'DELETE'
+    })
+    ElMessage.success('删除成功')
+    fetchBanners()
+  } catch {
+    // 用户取消操作
+  }
+}
+
+// 提交轮播图表单
+const handleSubmitBanner = async () => {
+  if (!bannerFormRef.value) return
+  
+  await bannerFormRef.value.validate(async (valid) => {
+    if (valid) {
+      submitting.value = true
+      try {
+        const method = bannerForm.value.code ? 'PUT' : 'POST'
+        const url = API.BANNER.CREATE
+        const submitData = {
+          code: bannerForm.value.code,
+          image: bannerForm.value.picture.code,
+          title: bannerForm.value.title,
+          sort: bannerForm.value.sort,
+        }
+
+        await request(url, {
+          method,
+          body: JSON.stringify(submitData)
+        })
+        ElMessage.success(bannerForm.value.code ? '更新成功' : '添加成功')
+        bannerDialogVisible.value = false
+        fetchBanners()
+      } finally {
+        submitting.value = false
+      }
+    }
+  })
+}
+
+// 处理轮播图分页
+const handleBannerSizeChange = (val) => {
+  bannerQuery.size = val
+  bannerQuery.index = 1
+  fetchBanners()
+}
+
+const handleBannerCurrentChange = (val) => {
+  bannerQuery.index = val
+  fetchBanners()
+}
+
 // 处理上传
 const handleUpload = () => {
   uploadDialogVisible.value = true
@@ -222,9 +373,11 @@ const handleUpload = () => {
   uploadForm.file = null
 }
 
-const handleUploadSuccess = (response) => {
-  uploadForm.url = response.url
-  uploadForm.file = response.url
+const handleUploadSuccess = (data) => {
+  bannerForm.value.picture = {
+    code: data.url,
+    name: data.filename
+  }
 }
 
 const beforeImageUpload = (file) => {
@@ -280,9 +433,83 @@ const handleCurrentChange = (val) => {
 const handleSearch = () => {
   // TODO: 调用搜索API
 }
+
+// 初始化
+fetchBanners()
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+.image-management {
+  padding: 16px;
+}
+
+.tab-header {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.banner-image {
+  width: 160px;
+  height: 90px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+}
+
+.pagination-container {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 0;
+
+  :deep(.el-pagination) {
+    padding: 0;
+    margin: 0;
+    font-weight: normal;
+
+    .el-pagination__total {
+      margin-right: 16px;
+    }
+
+    .el-pagination__sizes {
+      margin-right: 16px;
+    }
+
+    button {
+      background-color: var(--el-bg-color);
+      
+      &:disabled {
+        background-color: var(--el-disabled-bg-color);
+      }
+    }
+
+    .el-pager li {
+      background-color: var(--el-bg-color);
+      
+      &.is-active {
+        background-color: var(--el-color-primary);
+      }
+    }
+  }
+}
+
 .image-management {
   padding: 20px;
 }

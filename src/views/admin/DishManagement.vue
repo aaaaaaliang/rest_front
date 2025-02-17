@@ -1,451 +1,439 @@
 <template>
   <div class="dish-management">
-    <!-- 左侧分类列表 -->
-    <el-card class="category-card">
-      <template #header>
-        <div class="card-header">
-          <span>菜品分类</span>
-          <el-button type="primary" size="small" @click="handleAddCategory">
-            新增分类
-          </el-button>
-        </div>
-      </template>
-      
-      <el-tree
-        :data="categories"
-        :props="{ label: 'name' }"
-        @node-click="handleCategoryClick"
-        default-expand-all
-      >
-        <template #default="{ node, data }">
-          <div class="category-node">
-            <span>{{ node.label }}</span>
-            <div class="category-actions">
-              <el-button 
-                type="primary" 
-                link
-                @click.stop="handleEditCategory(data)"
-              >
-                编辑
-              </el-button>
-              <el-button 
-                type="danger" 
-                link
-                @click.stop="handleDeleteCategory(data)"
-              >
-                删除
-              </el-button>
-            </div>
-          </div>
-        </template>
-      </el-tree>
-    </el-card>
-
-    <!-- 右侧菜品列表 -->
-    <el-card class="dish-card">
+    <el-card>
       <template #header>
         <div class="card-header">
           <div class="header-left">
-            <span>菜品列表</span>
-            <el-tag style="margin-left: 8px" v-if="currentCategory">
-              {{ currentCategory.name }}
-            </el-tag>
+            <span>菜品管理</span>
+            <el-select 
+              v-model="queryParams.category_code" 
+              placeholder="选择分类"
+              clearable
+              @change="handleSearch"
+            >
+              <el-option
+                v-for="item in filterCategories"
+                :key="item.code"
+                :label="item.CategoryName"
+                :value="item.code"
+              />
+            </el-select>
           </div>
-          <el-button type="primary" @click="handleAddDish">
+          <el-button type="primary" @click="handleAdd">
             新增菜品
           </el-button>
         </div>
       </template>
 
-      <el-table :data="dishes" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="图片" width="100">
-          <template #default="scope">
+      <!-- 菜品列表 -->
+      <el-table
+        :data="tableData"
+        border
+        v-loading="loading"
+      >
+        <el-table-column label="菜品图片" width="120" align="center">
+          <template #default="{ row }">
             <el-image
-              style="width: 50px; height: 50px"
-              :src="scope.row.image"
-              :preview-src-list="[scope.row.image]"
+              v-if="row.picture?.code"
+              :src="row.picture.code"
+              :preview-src-list="[row.picture.code]"
+              fit="cover"
+              style="width: 60px; height: 60px"
             />
+            <el-icon v-else><Picture /></el-icon>
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="菜品名称" />
-        <el-table-column prop="price" label="价格">
-          <template #default="scope">
-            ¥{{ scope.row.price.toFixed(2) }}
+        
+        <el-table-column prop="products_name" label="菜品名称" min-width="120" />
+        <el-table-column prop="category_name" label="所属分类" width="120" />
+        <el-table-column prop="price" label="价格" width="100">
+          <template #default="{ row }">
+            ¥{{ row.price.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column prop="categoryName" label="分类" />
-        <el-table-column prop="status" label="状态">
-          <template #default="scope">
-            <el-switch
-              v-model="scope.row.status"
-              :active-value="1"
-              :inactive-value="0"
-              @change="handleStatusChange(scope.row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column prop="stock" label="库存" width="120">
-          <template #default="scope">
-            <el-input-number 
-              v-model="scope.row.stock" 
-              :min="0"
-              :max="999"
-              size="small"
-              @change="handleStockChange(scope.row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200">
-          <template #default="scope">
-            <el-button size="small" @click="handleEditDish(scope.row)">
+        <el-table-column prop="count" label="库存" width="100" align="center" />
+        <el-table-column prop="describe" label="描述" min-width="200" show-overflow-tooltip />
+
+        <el-table-column label="操作" width="180" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button 
+              type="primary" 
+              link
+              @click="handleEdit(row)"
+            >
               编辑
             </el-button>
-            <el-button
-              size="small"
-              type="danger"
-              @click="handleDeleteDish(scope.row)"
+            <el-popconfirm
+              title="确定删除此菜品吗？"
+              @confirm="handleDelete(row.code)"
             >
-              删除
-            </el-button>
+              <template #reference>
+                <el-button 
+                  type="danger" 
+                  link
+                >
+                  删除
+                </el-button>
+              </template>
+            </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="queryParams.index"
+          v-model:page-size="queryParams.size"
+          :total="total"
+          :page-sizes="[10, 20, 50, 100]"
+          background
+          layout="total, sizes, prev, pager, next"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
-    <!-- 分类对话框 -->
+    <!-- 新增/编辑对话框 -->
     <el-dialog
-      v-model="categoryDialogVisible"
-      :title="categoryDialogType === 'add' ? '新增分类' : '编辑分类'"
-      width="500px"
-    >
-      <el-form
-        :model="categoryForm"
-        :rules="categoryRules"
-        ref="categoryFormRef"
-        label-width="80px"
-      >
-        <el-form-item label="分类名称" prop="name">
-          <el-input v-model="categoryForm.name" />
-        </el-form-item>
-        <el-form-item label="排序" prop="sort">
-          <el-input-number v-model="categoryForm.sort" :min="0" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="categoryDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmitCategory">
-            确定
-          </el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 菜品对话框 -->
-    <el-dialog
-      v-model="dishDialogVisible"
-      :title="dishDialogType === 'add' ? '新增菜品' : '编辑菜品'"
+      v-model="dialogVisible"
+      :title="dialogType === 'add' ? '新增菜品' : '编辑菜品'"
       width="600px"
     >
       <el-form
-        :model="dishForm"
-        :rules="dishRules"
-        ref="dishFormRef"
+        ref="formRef"
+        :model="form"
+        :rules="rules"
         label-width="80px"
       >
-        <el-form-item label="菜品名称" prop="name">
-          <el-input v-model="dishForm.name" />
+        <el-form-item label="菜品图片">
+          <upload-file
+            v-model="form.picture.code"
+            accept="image/*"
+            :max-size="5"
+            tip="支持 jpg、png、gif 格式，大小不超过5MB"
+            @success="handleUploadSuccess"
+          />
         </el-form-item>
-        <el-form-item label="分类" prop="categoryId">
-          <el-select v-model="dishForm.categoryId" style="width: 100%">
-            <el-option
-              v-for="category in categories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
-            />
+
+        <el-form-item label="菜品名称" prop="products_name">
+          <el-input v-model="form.products_name" />
+        </el-form-item>
+
+        <el-form-item label="所属分类" prop="category_code">
+          <el-select 
+            v-model="form.category_code" 
+            placeholder="请选择分类"
+            clearable
+          >
+            <el-option-group
+              v-for="group in categoryOptions"
+              :key="group.code"
+              :label="group.CategoryName"
+            >
+              <el-option
+                v-for="item in group.sub_categories"
+                :key="item.code"
+                :label="item.CategoryName"
+                :value="item.code"
+              />
+              <!-- 如果该分类没有子分类，则显示自己 -->
+              <el-option
+                v-if="!group.sub_categories?.length"
+                :key="group.code"
+                :label="group.CategoryName"
+                :value="group.code"
+              />
+            </el-option-group>
           </el-select>
         </el-form-item>
+
         <el-form-item label="价格" prop="price">
           <el-input-number 
-            v-model="dishForm.price" 
-            :precision="2" 
-            :step="0.1" 
+            v-model="form.price"
+            :precision="2"
+            :step="0.1"
             :min="0"
           />
         </el-form-item>
-        <el-form-item label="图片" prop="image">
-          <el-upload
-            class="dish-image-upload"
-            action="/api/upload"
-            :show-file-list="false"
-            :on-success="handleUploadSuccess"
-            :before-upload="beforeUpload"
-          >
-            <img v-if="dishForm.image" :src="dishForm.image" class="uploaded-image">
-            <el-icon v-else class="upload-icon"><Plus /></el-icon>
-          </el-upload>
+
+        <el-form-item label="库存" prop="count">
+          <el-input-number 
+            v-model="form.count"
+            :min="0"
+            :precision="0"
+          />
         </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="dishForm.description"
+
+        <el-form-item label="描述" prop="describe">
+          <el-input 
+            v-model="form.describe"
             type="textarea"
             :rows="3"
           />
         </el-form-item>
-        <el-form-item label="库存数量" prop="stock">
-          <el-input-number
-            v-model="dishForm.stock"
-            :min="0"
-            :max="999"
-            style="width: 100%"
+
+        <el-form-item label="特色菜品">
+          <el-switch
+            v-model="form.main"
+            :active-value="1"
+            :inactive-value="0"
           />
         </el-form-item>
       </el-form>
+
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dishDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmitDish">
-            确定
-          </el-button>
-        </span>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+          确定
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Picture } from '@element-plus/icons-vue'
+import { useCategoryStore } from '../../stores/category'
+import UploadFile from '../../components/UploadFile.vue'
+import request from '../../utils/request'
+import { API } from '../../config/api'
 
-// 分类数据
-const categories = ref([
-  {
-    id: 1,
-    name: '热菜',
-    sort: 1,
-    children: [
-      { id: 11, name: '川菜', sort: 1 },
-      { id: 12, name: '粤菜', sort: 2 }
-    ]
-  },
-  {
-    id: 2,
-    name: '凉菜',
-    sort: 2
-  },
-  {
-    id: 3,
-    name: '主食',
-    sort: 3
-  }
-])
+const categoryStore = useCategoryStore()
+const loading = ref(false)
+const dialogVisible = ref(false)
+const dialogType = ref('add')
+const submitting = ref(false)
+const formRef = ref()
+const tableData = ref([])
+const total = ref(0)
 
-// 菜品数据
-const dishes = ref([
-  {
-    id: 1,
-    name: '宫保鸡丁',
-    price: 38.00,
-    image: 'https://via.placeholder.com/100',
-    categoryId: 11,
-    categoryName: '川菜',
-    status: 1,
-    description: '经典川菜，口感麻辣鲜香'
-  },
-  {
-    id: 2,
-    name: '白切鸡',
-    price: 48.00,
-    image: 'https://via.placeholder.com/100',
-    categoryId: 12,
-    categoryName: '粤菜',
-    status: 1,
-    description: '鲜嫩多汁，配以姜葱酱'
-  }
-])
-
-const currentCategory = ref(null)
-const categoryDialogVisible = ref(false)
-const categoryDialogType = ref('add')
-const dishDialogVisible = ref(false)
-const dishDialogType = ref('add')
-const categoryFormRef = ref(null)
-const dishFormRef = ref(null)
-
-const categoryForm = reactive({
-  name: '',
-  sort: 0
+// 查询参数
+const queryParams = reactive({
+  index: 1,
+  size: 10,
+  category_code: ''
 })
 
-const dishForm = reactive({
-  name: '',
-  categoryId: '',
+// 表单数据
+const form = ref({
+  code: '',
+  products_name: '',
+  category_code: '',
   price: 0,
-  image: '',
-  description: '',
-  stock: 0
+  count: 0,
+  describe: '',
+  main: 0,
+  picture: {
+    code: '',
+    name: ''
+  }
 })
 
-const categoryRules = {
-  name: [
-    { required: true, message: '请输入分类名称', trigger: 'blur' }
-  ]
-}
-
-const dishRules = {
-  name: [
-    { required: true, message: '请输入菜品名称', trigger: 'blur' }
+// 表单验证规则
+const rules = {
+  products_name: [
+    { required: true, message: '请输入菜品名称', trigger: 'blur' },
+    { max: 50, message: '菜品名称不能超过50个字符', trigger: 'blur' }
   ],
-  categoryId: [
-    { required: true, message: '请选择分类', trigger: 'change' }
+  category_code: [
+    { required: true, message: '请选择所属分类', trigger: 'change' }
   ],
   price: [
     { required: true, message: '请输入价格', trigger: 'blur' }
   ],
-  image: [
-    { required: true, message: '请上传图片', trigger: 'change' }
+  count: [
+    { required: true, message: '请输入库存数量', trigger: 'blur' }
   ]
 }
 
-// 分类相关方法
-const handleAddCategory = () => {
-  categoryDialogType.value = 'add'
-  categoryForm.name = ''
-  categoryForm.sort = 0
-  categoryDialogVisible.value = true
-}
-
-const handleEditCategory = (category) => {
-  categoryDialogType.value = 'edit'
-  categoryForm.name = category.name
-  categoryForm.sort = category.sort
-  categoryDialogVisible.value = true
-}
-
-const handleDeleteCategory = (category) => {
-  ElMessageBox.confirm(
-    `确定要删除分类"${category.name}"吗？`,
-    '警告',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+// 获取菜品列表
+const fetchList = async () => {
+  loading.value = true
+  try {
+    const params = new URLSearchParams({
+      index: queryParams.index,
+      size: queryParams.size
+    })
+    if (queryParams.category_code) {
+      params.append('category_code', queryParams.category_code)
     }
-  ).then(() => {
-    // TODO: 调用删除API
-    ElMessage.success('删除成功')
-  })
-}
-
-const handleSubmitCategory = async () => {
-  if (!categoryFormRef.value) return
-  
-  await categoryFormRef.value.validate(async (valid) => {
-    if (valid) {
-      // TODO: 调用新增/编辑API
-      categoryDialogVisible.value = false
-      ElMessage.success('保存成功')
-    }
-  })
-}
-
-const handleCategoryClick = (category) => {
-  currentCategory.value = category
-  // TODO: 根据分类加载菜品列表
-}
-
-// 菜品相关方法
-const handleAddDish = () => {
-  dishDialogType.value = 'add'
-  Object.keys(dishForm).forEach(key => {
-    dishForm[key] = key === 'price' ? 0 : ''
-  })
-  dishDialogVisible.value = true
-}
-
-const handleEditDish = (dish) => {
-  dishDialogType.value = 'edit'
-  Object.keys(dishForm).forEach(key => {
-    dishForm[key] = dish[key]
-  })
-  dishDialogVisible.value = true
-}
-
-const handleDeleteDish = (dish) => {
-  ElMessageBox.confirm(
-    `确定要删除菜品"${dish.name}"吗？`,
-    '警告',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    // TODO: 调用删除API
-    ElMessage.success('删除成功')
-  })
-}
-
-const handleStatusChange = (dish) => {
-  // TODO: 调用状态更新API
-  ElMessage.success(`菜品${dish.name}状态已${dish.status === 1 ? '上架' : '下架'}`)
-}
-
-const handleStockChange = (dish) => {
-  // TODO: 调用库存更新API
-  ElMessage.success(`菜品${dish.name}库存已更新为${dish.stock}`)
-}
-
-const handleSubmitDish = async () => {
-  if (!dishFormRef.value) return
-  
-  await dishFormRef.value.validate(async (valid) => {
-    if (valid) {
-      // TODO: 调用新增/编辑API
-      dishDialogVisible.value = false
-      ElMessage.success('保存成功')
-    }
-  })
-}
-
-// 图片上传相关方法
-const handleUploadSuccess = (response) => {
-  dishForm.image = response.url
-  ElMessage.success('上传成功')
-}
-
-const beforeUpload = (file) => {
-  const isImage = file.type.startsWith('image/')
-  const isLt2M = file.size / 1024 / 1024 < 2
-
-  if (!isImage) {
-    ElMessage.error('只能上传图片文件!')
-    return false
+    
+    const res = await request(`${API.PRODUCT.LIST}?${params}`)
+    tableData.value = res.data || []
+    total.value = res.total || 0
+  } catch (error) {
+    ElMessage.error(error.message || '获取列表失败')
+  } finally {
+    loading.value = false
   }
-  if (!isLt2M) {
-    ElMessage.error('图片大小不能超过 2MB!')
-    return false
-  }
-  return true
 }
+
+// 修改分类数据处理逻辑
+const categoryOptions = computed(() => {
+  return categoryStore.categories.map(category => ({
+    code: category.code,
+    CategoryName: category.CategoryName,
+    sub_categories: category.sub_categories || []
+  }))
+})
+
+// 修改搜索框的分类选择器
+const filterCategories = computed(() => {
+  const result = []
+  const processCategories = (categories) => {
+    categories.forEach(category => {
+      if (category.sub_categories?.length) {
+        // 如果有子分类，添加子分类
+        category.sub_categories.forEach(subCategory => {
+          result.push({
+            code: subCategory.code,
+            CategoryName: `${category.CategoryName} / ${subCategory.CategoryName}`
+          })
+        })
+      } else {
+        // 如果没有子分类，添加当前分类
+        result.push({
+          code: category.code,
+          CategoryName: category.CategoryName
+        })
+      }
+    })
+  }
+  processCategories(categoryStore.categories)
+  return result
+})
+
+// 修改上传成功的处理
+const handleUploadSuccess = (data) => {
+  form.value.picture = {
+    code: data.url,
+    name: data.filename
+  }
+}
+
+// 修改表单初始化
+const initForm = () => ({
+  code: '',
+  products_name: '',
+  category_code: '',
+  price: 0,
+  count: 0,
+  describe: '',
+  main: 0,
+  picture: {
+    code: '',
+    name: ''
+  }
+})
+
+// 新增菜品
+const handleAdd = () => {
+  dialogType.value = 'add'
+  form.value = initForm()
+  dialogVisible.value = true
+}
+
+// 编辑菜品
+const handleEdit = (row) => {
+  dialogType.value = 'edit'
+  form.value = {
+    ...row,
+    main: row.main || 0,
+    picture: row.picture || {
+      code: '',
+      name: ''
+    }
+  }
+  dialogVisible.value = true
+}
+
+// 删除菜品
+const handleDelete = async (code) => {
+  try {
+    await request(`${API.PRODUCT.DELETE}?code=${code}`, {
+      method: 'DELETE'
+    })
+    ElMessage.success('删除成功')
+    fetchList()
+  } catch (error) {
+    ElMessage.error(error.message || '删除失败')
+  }
+}
+
+// 提交表单
+const handleSubmit = async () => {
+  if (!formRef.value) return
+  
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      submitting.value = true
+      try {
+        const api = dialogType.value === 'add' ? API.PRODUCT.CREATE : API.PRODUCT.UPDATE
+        const method = dialogType.value === 'add' ? 'POST' : 'PUT'
+        
+        // 构建提交数据
+        const submitData = {
+          ...form.value,
+          // 只有当有图片code和name时才传递picture对象
+          picture: form.value.picture?.code && form.value.picture?.name ? {
+            code: form.value.picture.code,
+            name: form.value.picture.name
+          } : undefined  // 改为 undefined 而不是 null
+        }
+
+        // 如果是编辑模式，确保传递code
+        if (dialogType.value === 'edit') {
+          submitData.code = form.value.code
+        }
+
+        await request(api, {
+          method,
+          body: JSON.stringify(submitData)
+        })
+        
+        ElMessage.success(dialogType.value === 'add' ? '创建成功' : '更新成功')
+        dialogVisible.value = false
+        fetchList()
+      } catch (error) {
+        ElMessage.error(error.message || '操作失败')
+      } finally {
+        submitting.value = false
+      }
+    }
+  })
+}
+
+// 处理搜索
+const handleSearch = () => {
+  queryParams.index = 1
+  fetchList()
+}
+
+// 处理分页
+const handleSizeChange = (val) => {
+  queryParams.size = val
+  fetchList()
+}
+
+const handleCurrentChange = (val) => {
+  queryParams.index = val
+  fetchList()
+}
+
+// 初始化
+onMounted(() => {
+  categoryStore.fetchCategories()
+  fetchList()
+})
 </script>
 
 <style scoped>
 .dish-management {
   padding: 20px;
-  display: flex;
-  gap: 20px;
-}
-
-.category-card {
-  width: 300px;
-  flex-shrink: 0;
-}
-
-.dish-card {
-  flex-grow: 1;
 }
 
 .card-header {
@@ -457,45 +445,22 @@ const beforeUpload = (file) => {
 .header-left {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
-.category-node {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+:deep(.el-table__row) {
+  .cell {
+    .el-button {
+      padding: 4px 8px;
+    }
+  }
 }
 
-.category-actions {
-  display: none;
+:deep(.el-dialog__body) {
+  padding-top: 20px;
 }
 
-.category-node:hover .category-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.dish-image-upload {
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  width: 100px;
-  height: 100px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.uploaded-image {
+:deep(.el-select) {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.upload-icon {
-  font-size: 28px;
-  color: #8c939d;
 }
 </style> 

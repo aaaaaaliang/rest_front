@@ -15,45 +15,12 @@
         :text-color="menuStyle.textColor"
         :active-text-color="menuStyle.activeTextColor"
       >
-        <el-menu-item index="/admin/dashboard">
-          <el-icon><DataLine /></el-icon>
-          <span>数据看板</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/roles">
-          <el-icon><UserFilled /></el-icon>
-          <span>角色管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/users">
-          <el-icon><User /></el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/dishes">
-          <el-icon><Food /></el-icon>
-          <span>菜品管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/orders">
-          <el-icon><List /></el-icon>
-          <span>订单管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/salary">
-          <el-icon><Money /></el-icon>
-          <span>工资管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/customer-service">
-          <el-icon><Service /></el-icon>
-          <span>客服管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="/admin/images">
-          <el-icon><Picture /></el-icon>
-          <span>图片管理</span>
-        </el-menu-item>
+        <template v-for="menu in menus" :key="menu.code">
+          <el-menu-item :index="menu.path">
+            <el-icon><component :is="menu.icon" /></el-icon>
+            <span>{{ menu.name }}</span>
+          </el-menu-item>
+        </template>
       </el-menu>
     </el-aside>
     
@@ -95,8 +62,12 @@
 
           <el-dropdown>
             <span class="el-dropdown-link">
-              <el-avatar :size="32" :src="avatar" />
-              <span class="username">{{ userInfo.username }}</span>
+              <el-avatar 
+                :size="32" 
+                :src="userInfo?.avatar" 
+                :icon="User"
+              />
+              <span class="username">{{ userInfo?.username }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -201,7 +172,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted, markRaw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   DataLine,
@@ -220,18 +191,24 @@ import {
   Monitor,
   Plus,
   SwitchButton,
-  Picture
+  Picture,
+  Menu,
+  Lock,
+  Setting
 } from '@element-plus/icons-vue'
 import { useThemeStore } from '../stores/theme'
 import { useUserStore } from '../stores/user'
+import { usePermissionStore } from '../stores/permission'
+import request from '../utils/request'
+import { API } from '../config/api'
 
 const route = useRoute()
 const router = useRouter()
 const isCollapse = ref(false)
-const avatar = ref('https://via.placeholder.com/100')
 
 const themeStore = useThemeStore()
 const userStore = useUserStore()
+const permissionStore = usePermissionStore()
 
 const activeMenu = computed(() => route.path)
 
@@ -258,7 +235,6 @@ const menuStyle = computed(() => {
 const showUserInfoDialog = ref(false)
 const userInfo = ref({
   username: '管理员',
-  avatar: 'https://via.placeholder.com/100'
 })
 
 const userForm = reactive({
@@ -302,9 +278,14 @@ const userRules = {
   ]
 }
 
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await request(API.USER.LOGOUT) // 后端会清除 cookie
+    userStore.$reset() // 清除前端状态
+    router.push('/login')
+  } catch (error) {
+    ElMessage.error('登出失败')
+  }
 }
 
 // 切换主题
@@ -346,6 +327,70 @@ const beforeAvatarUpload = (file) => {
   }
   return true
 }
+
+// 定义菜单数据
+const menus = ref([
+  {
+    code: 'dashboard',
+    name: '仪表盘',
+    path: '/admin/dashboard',
+    icon: markRaw(DataLine)
+  },
+  {
+    code: 'user',
+    name: '用户管理',
+    path: '/admin/user',
+    icon: markRaw(User)
+  },
+  {
+    code: 'role',
+    name: '角色管理',
+    path: '/admin/role',
+    icon: markRaw(Lock)
+  },
+  {
+    code: 'dishes',
+    name: '菜品管理',
+    path: '/admin/dishes',
+    icon: markRaw(Food)
+  },
+  {
+    code: 'orders',
+    name: '订单管理',
+    path: '/admin/orders',
+    icon: markRaw(List)
+  },
+  {
+    code: 'salary',
+    name: '工资管理',
+    path: '/admin/salary',
+    icon: markRaw(Money)
+  },
+  {
+    code: 'customer-service',
+    name: '客服管理',
+    path: '/admin/customer-service',
+    icon: markRaw(Service)
+  },
+  // {
+  //   code: 'system',
+  //   name: '系统设置',
+  //   path: '/admin/system',
+  //   icon: markRaw(Setting)
+  // },
+  {
+    code: 'images',
+    name: '图片管理',
+    path: '/admin/images',
+    icon: markRaw(Picture)
+  }
+])
+
+// 在组件挂载时初始化权限
+onMounted(() => {
+  // 暂时注释掉权限初始化
+  // await permissionStore.initPermissions()
+})
 </script>
 
 <style scoped>

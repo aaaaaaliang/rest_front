@@ -1,0 +1,36 @@
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 0;
+
+  .el-pagination {
+    padding: 0;
+    margin: 0;
+    font-weight: normal;
+
+    .el-pagination__total {
+      margin-right: 16px;
+    }
+
+    .el-pagination__sizes {
+      margin-right: 16px;
+    }
+
+    button {
+      background-color: var(--el-bg-color);
+      
+      &:disabled {
+        background-color: var(--el-disabled-bg-color);
+      }
+    }
+
+    .el-pager li {
+      background-color: var(--el-bg-color);
+      
+      &.is-active {
+        background-color: var(--el-color-primary);
+      }
+    }
+  }
+} 

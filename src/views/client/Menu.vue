@@ -1,48 +1,90 @@
 <template>
-  <div class="menu">
+  <div class="menu-page">
     <!-- 左侧分类导航 -->
     <div class="category-nav">
-      <el-menu
-        :default-active="activeCategory"
-        @select="handleCategorySelect"
+      <div
+        class="category-item"
+        :class="{ active: !currentCategory }"
+        @click="handleCategoryClick('')"
       >
-        <el-menu-item 
-          v-for="category in categories" 
-          :key="category.id"
-          :index="category.id.toString()"
-        >
-          {{ category.name }}
-        </el-menu-item>
-      </el-menu>
+        全部菜品
+      </div>
+      <div
+        v-for="category in categoryStore.categories"
+        :key="category.code"
+        class="category-item"
+        :class="{ active: currentCategory === category.code }"
+        @click="handleCategoryClick(category.code)"
+      >
+        {{ category.CategoryName }}
+        <template v-if="category.sub_categories?.length">
+          <div
+            v-for="sub in category.sub_categories"
+            :key="sub.code"
+            class="sub-category"
+            :class="{ active: currentCategory === sub.code }"
+            @click.stop="handleCategoryClick(sub.code)"
+          >
+            {{ sub.CategoryName }}
+          </div>
+        </template>
+      </div>
     </div>
 
     <!-- 右侧菜品列表 -->
-    <div class="dish-list">
-      <el-row :gutter="20">
-        <el-col 
-          :span="8" 
-          v-for="dish in currentCategoryDishes" 
-          :key="dish.id"
+    <div class="dish-content">
+      <div class="dish-list">
+        <el-card
+          v-for="dish in dishes"
+          :key="dish.code"
+          class="dish-card"
+          shadow="hover"
         >
-          <el-card :body-style="{ padding: '0px' }" class="dish-card">
-            <img :src="dish.image" class="dish-image">
-            <div class="dish-info">
-              <h3>{{ dish.name }}</h3>
-              <p class="description">{{ dish.description }}</p>
-              <div class="price-action">
-                <span class="price">¥{{ dish.price.toFixed(2) }}</span>
-                <el-button 
-                  type="primary" 
-                  circle
+          <div class="dish-image">
+            <el-image
+              :src="getImageUrl(dish.picture?.code, IMAGE_SIZE.MEDIUM)"
+              :preview-src-list="dish.picture?.code ? [dish.picture.code] : []"
+              fit="cover"
+            >
+              <template #error>
+                <div class="image-placeholder">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
+          </div>
+          <div class="dish-info">
+            <h3 class="dish-name">{{ dish.products_name }}</h3>
+            <p class="dish-desc">{{ dish.describe || '暂无描述' }}</p>
+            <div class="dish-footer">
+              <span class="price">¥{{ dish.price.toFixed(2) }}</span>
+              <div class="actions">
+                <el-button
+                  type="primary"
+                  size="small"
+                  :disabled="dish.count <= 0"
                   @click="handleAddToCart(dish)"
                 >
-                  <el-icon><Plus /></el-icon>
+                  {{ dish.count > 0 ? '加入购物车' : '已售罄' }}
                 </el-button>
               </div>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+          </div>
+        </el-card>
+      </div>
+
+      <!-- 分页 -->
+      <div class="pagination">
+        <el-pagination
+          v-model:current-page="queryParams.index"
+          v-model:page-size="queryParams.size"
+          :total="total"
+          :page-sizes="[12, 24, 36]"
+          layout="total, sizes, prev, pager, next"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </div>
 
     <!-- 购物车抽屉 -->
@@ -55,55 +97,52 @@
       <div class="cart-content">
         <template v-if="cartItems.length > 0">
           <div class="cart-items">
-            <div 
-              v-for="item in cartItems" 
-              :key="item.id"
+            <div
+              v-for="item in cartItems"
+              :key="item.code"
               class="cart-item"
             >
-              <img :src="item.image" class="item-image">
+              <el-image
+                :src="getImageUrl(item.picture?.code, IMAGE_SIZE.THUMBNAIL)"
+                fit="cover"
+                class="item-image"
+              >
+                <template #error>
+                  <el-icon><Picture /></el-icon>
+                </template>
+              </el-image>
               <div class="item-info">
-                <h4>{{ item.name }}</h4>
-                <p class="item-price">¥{{ item.price.toFixed(2) }}</p>
-              </div>
-              <div class="item-actions">
-                <el-input-number 
-                  v-model="item.quantity" 
-                  :min="1"
-                  :max="99"
-                  size="small"
-                  @change="handleQuantityChange(item)"
-                />
-                <el-button 
-                  type="danger" 
-                  circle 
-                  size="small"
-                  @click="handleRemoveFromCart(item)"
-                >
-                  <el-icon><Delete /></el-icon>
-                </el-button>
+                <h4>{{ item.product_name }}</h4>
+                <div class="item-price">¥{{ item.product_price.toFixed(2) }}</div>
+                <div class="item-actions">
+                  <el-input-number
+                    v-model="item.select_num"
+                    :min="1"
+                    :max="99"
+                    size="small"
+                    @change="() => handleQuantityChange(item)"
+                  />
+                  <el-button
+                    type="danger"
+                    link
+                    @click="handleRemoveFromCart(item)"
+                  >
+                    删除
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
-          
           <div class="cart-footer">
             <div class="total">
-              <span>总计：</span>
-              <span class="total-price">¥{{ totalPrice.toFixed(2) }}</span>
+              总计: <span class="total-price">¥{{ totalPrice.toFixed(2) }}</span>
             </div>
-            <el-button 
-              type="primary" 
-              :disabled="cartItems.length === 0"
-              @click="handleCheckout"
-            >
-              去结算
+            <el-button type="primary" block @click="handleCheckout">
+              去结算 ({{ cartItems.length }}件)
             </el-button>
           </div>
         </template>
-        
-        <el-empty 
-          v-else 
-          description="购物车是空的"
-        />
+        <el-empty v-else description="购物车是空的" />
       </div>
     </el-drawer>
 
@@ -129,7 +168,7 @@
           <el-input v-model="orderForm.remarks" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
-      
+
       <div class="order-items">
         <h4>订单明细</h4>
         <el-table :data="cartItems" style="width: 100%">
@@ -146,13 +185,13 @@
             </template>
           </el-table-column>
         </el-table>
-        
+
         <div class="order-total">
           <span>订单总额：</span>
           <span class="total-price">¥{{ totalPrice.toFixed(2) }}</span>
         </div>
       </div>
-      
+
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="checkoutDialogVisible = false">取消</el-button>
@@ -166,44 +205,75 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../../stores/cart'
 import { ElMessage } from 'element-plus'
+import { Picture } from '@element-plus/icons-vue'
+import { useCategoryStore } from '../../stores/category'
+import request from '../../utils/request'
+import { API } from '../../config/api'
+import { IMAGE_SIZE, getImageUrl } from '../../config/constants'
 
 const router = useRouter()
 const cartStore = useCartStore()
+const categoryStore = useCategoryStore()
 
-// 分类数据
-const categories = ref([
-  { id: 1, name: '热菜' },
-  { id: 2, name: '凉菜' },
-  { id: 3, name: '主食' },
-  { id: 4, name: '饮品' }
-])
+const dishes = ref([])
+const total = ref(0)
+const currentCategory = ref('')
 
-// 菜品数据
-const dishes = ref([
-  {
-    id: 1,
-    categoryId: 1,
-    name: '宫保鸡丁',
-    price: 38.00,
-    image: 'https://via.placeholder.com/300x200',
-    description: '经典川菜，口感麻辣鲜香'
-  },
-  {
-    id: 2,
-    categoryId: 1,
-    name: '水煮鱼',
-    price: 88.00,
-    image: 'https://via.placeholder.com/300x200',
-    description: '新鲜草鱼，麻辣鲜香'
-  },
-  // 更多菜品数据...
-])
+// 查询参数
+const queryParams = reactive({
+  index: 1,
+  size: 12,
+  category_code: ''
+})
 
-const activeCategory = ref('1')
+// 获取菜品列表
+const fetchDishes = async () => {
+  try {
+    const params = new URLSearchParams({
+      index: queryParams.index,
+      size: queryParams.size
+    })
+    if (queryParams.category_code) {
+      params.append('category_code', queryParams.category_code)
+    }
+
+    const res = await request(`${API.PRODUCT.LIST}?${params}`)
+    dishes.value = res.data || []
+    total.value = res.total || 0
+  } catch (error) {
+    ElMessage.error('获取菜品列表失败')
+  }
+}
+
+// 处理分类点击
+const handleCategoryClick = (code) => {
+  currentCategory.value = code
+  queryParams.category_code = code
+  queryParams.index = 1
+  fetchDishes()
+}
+
+// 处理加入购物车
+const handleAddToCart = async (dish) => {
+  await cartStore.addToCart(dish)
+  ElMessage.success('加入购物车成功')
+}
+
+// 处理分页
+const handleSizeChange = (val) => {
+  queryParams.size = val
+  fetchDishes()
+}
+
+const handleCurrentChange = (val) => {
+  queryParams.index = val
+  fetchDishes()
+}
+
 const cartDrawerVisible = ref(false)
 const checkoutDialogVisible = ref(false)
 const orderFormRef = ref(null)
@@ -224,46 +294,28 @@ const rules = {
   ]
 }
 
-// 计算属性
-const currentCategoryDishes = computed(() => {
-  return dishes.value.filter(dish => 
-    dish.categoryId === parseInt(activeCategory.value)
-  )
+const cartItems = computed(() => cartStore.items)
+const totalPrice = computed(() => {
+  return cartItems.value.reduce((sum, item) => {
+    return sum + item.product_price * item.select_num
+  }, 0)
 })
 
-const cartItems = computed(() => cartStore.items)
-const totalPrice = computed(() => cartStore.totalPrice)
-
-// 方法
-const handleCategorySelect = (index) => {
-  activeCategory.value = index
+const handleQuantityChange = async (item) => {
+  await cartStore.updateQuantity(item.product_code, item.select_num)
 }
 
-const handleAddToCart = (dish) => {
-  cartStore.addToCart(dish)
-  ElMessage.success('已添加到购物车')
-}
-
-const handleQuantityChange = (item) => {
-  cartStore.updateQuantity(item.id, item.quantity)
-}
-
-const handleRemoveFromCart = (item) => {
-  cartStore.removeFromCart(item.id)
+const handleRemoveFromCart = async (item) => {
+  await cartStore.removeFromCart(item.code)
 }
 
 const handleCheckout = () => {
-  if (!localStorage.getItem('token')) {
-    ElMessage.warning('请先登录')
-    router.push('/login')
-    return
-  }
   checkoutDialogVisible.value = true
 }
 
 const handleSubmitOrder = async () => {
   if (!orderFormRef.value) return
-  
+
   await orderFormRef.value.validate(async (valid) => {
     if (valid) {
       // TODO: 调用提交订单API
@@ -274,125 +326,192 @@ const handleSubmitOrder = async () => {
     }
   })
 }
+
+// 初始化
+onMounted(async () => {
+  categoryStore.fetchCategories()
+  fetchDishes()
+  await cartStore.fetchCartList()
+})
 </script>
 
-<style scoped>
-.menu {
+<style scoped lang="scss">
+.menu-page {
   display: flex;
-  height: calc(100vh - 60px);
+  min-height: calc(100vh - 60px);
+  background: #f5f5f5;
+  padding: 20px;
+  gap: 20px;
 }
 
 .category-nav {
   width: 200px;
-  border-right: 1px solid #eee;
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 0;
+  height: fit-content;
+
+  .category-item {
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 15px;
+
+    &:hover, &.active {
+      color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
+    }
+
+    .sub-category {
+      padding: 8px 0 8px 20px;
+      margin-top: 8px;
+      font-size: 14px;
+      color: var(--el-text-color-regular);
+
+      &:hover, &.active {
+        color: var(--el-color-primary);
+      }
+    }
+  }
 }
 
-.dish-list {
+.dish-content {
   flex: 1;
+  background: #fff;
+  border-radius: 8px;
   padding: 20px;
-  overflow-y: auto;
+
+  .dish-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
 }
 
 .dish-card {
-  margin-bottom: 20px;
-}
-
-.dish-image {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-}
-
-.dish-info {
-  padding: 14px;
-}
-
-.dish-info h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.description {
-  color: #666;
-  margin: 10px 0;
-  height: 40px;
+  border-radius: 8px;
   overflow: hidden;
+  transition: all 0.3s;
+
+  .dish-image {
+    height: 160px;
+    overflow: hidden;
+
+    .el-image {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .dish-info {
+    padding: 12px;
+
+    .dish-name {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .dish-desc {
+      margin: 8px 0;
+      font-size: 13px;
+      color: var(--el-text-color-secondary);
+      line-height: 1.4;
+      height: 36px;
+    }
+
+    .dish-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+
+      .price {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--el-color-danger);
+      }
+    }
+  }
 }
 
-.price-action {
+.pagination {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.price {
-  color: #f56c6c;
-  font-size: 20px;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 
 .cart-content {
   height: 100%;
   display: flex;
   flex-direction: column;
+
+  .cart-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px;
+  }
+
+  .cart-item {
+    display: flex;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    .item-image {
+      width: 80px;
+      height: 80px;
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .item-info {
+      flex: 1;
+      min-width: 0;
+
+      h4 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .item-price {
+        color: var(--el-color-danger);
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .item-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        .el-input-number {
+          width: 100px;
+        }
+      }
+    }
+  }
+
+  .cart-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    background: #fff;
+
+    .total {
+      margin-bottom: 12px;
+      text-align: right;
+
+      .total-price {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--el-color-danger);
+      }
+    }
+  }
 }
 
-.cart-items {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.cart-item {
-  display: flex;
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.item-image {
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-  margin-right: 10px;
-}
-
-.item-info {
-  flex: 1;
-}
-
-.item-info h4 {
-  margin: 0;
-}
-
-.item-price {
-  color: #f56c6c;
-}
-
-.item-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.cart-footer {
-  padding: 20px;
-  border-top: 1px solid #eee;
-}
-
-.total {
-  margin-bottom: 10px;
-}
-
-.total-price {
-  color: #f56c6c;
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.order-items {
-  margin-top: 20px;
-}
-
-.order-total {
-  margin-top: 20px;
-  text-align: right;
-}
-</style> 
+</style>

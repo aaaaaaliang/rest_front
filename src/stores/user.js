@@ -1,36 +1,24 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
-    userInfo: null,
-    token: null
+    username: '',    // 初始值为空字符串
+    user_code: '',   // 初始值为空字符串
+    roles: [],        // 初始值为空数组
+    permissions: []   // 存储权限
   }),
-
   actions: {
     setUserInfo(info) {
-      this.userInfo = info
+      this.username = info.username
+      this.user_code = info.user_code
+      this.roles = info.roles
     },
-
-    setToken(token) {
-      this.token = token
-      localStorage.setItem('token', token)
+    setPermissions(permissions) {
+      this.permissions = permissions
     },
-
-    async getUserInfo() {
-      try {
-        // TODO: 调用获取用户信息API
-        const response = await fetch('/api/user/info')
-        const data = await response.json()
-        this.setUserInfo(data)
-      } catch (error) {
-        console.error('获取用户信息失败:', error)
-      }
-    },
-
-    logout() {
-      this.userInfo = null
-      this.token = null
-      localStorage.removeItem('token')
+    isAdmin() {
+      return this.user_code === 'admin' // 根据 user_code 判断
     }
   }
 }) 

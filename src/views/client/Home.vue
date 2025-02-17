@@ -2,7 +2,7 @@
   <div class="home">
     <!-- 轮播图 -->
     <el-carousel height="400px" class="banner">
-      <el-carousel-item v-for="item in banners" :key="item.id">
+      <el-carousel-item v-for="item in bannerList" :key="item.code">
         <img :src="item.image" :alt="item.title" class="banner-image">
       </el-carousel-item>
     </el-carousel>
@@ -11,11 +11,21 @@
     <div class="section">
       <h2 class="section-title">特色菜品</h2>
       <el-row :gutter="20">
-        <el-col :span="6" v-for="dish in featuredDishes" :key="dish.id">
+        <el-col :span="6" v-for="dish in featuredDishes" :key="dish.code">
           <el-card :body-style="{ padding: '0px' }" class="dish-card">
-            <img :src="dish.image" class="dish-image">
+            <el-image
+              :src="dish.picture?.code"
+              class="dish-image"
+              fit="cover"
+            >
+              <template #error>
+                <div class="image-placeholder">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
             <div class="dish-info">
-              <h3>{{ dish.name }}</h3>
+              <h3>{{ dish.products_name }}</h3>
               <p class="price">¥{{ dish.price.toFixed(2) }}</p>
               <el-button type="primary" @click="handleOrder(dish)">
                 立即点餐
@@ -31,7 +41,7 @@
       <h2 class="section-title">关于我们</h2>
       <el-row :gutter="40">
         <el-col :span="12">
-          <img src="https://via.placeholder.com/600x400" alt="餐厅环境" class="about-image">
+          <img src="../../assets/env.webp" alt="餐厅环境" class="about-image">
         </el-col>
         <el-col :span="12">
           <div class="about-content">
@@ -59,64 +69,61 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../../stores/cart'
+import request from '../../utils/request'
+import { API } from '../../config/api'
+import { Picture } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const cartStore = useCartStore()
 
 // 轮播图数据
-const banners = ref([
-  {
-    id: 1,
-    image: 'https://via.placeholder.com/1200x400',
-    title: '美食盛宴'
-  },
-  {
-    id: 2,
-    image: 'https://via.placeholder.com/1200x400',
-    title: '特色菜品'
-  },
-  {
-    id: 3,
-    image: 'https://via.placeholder.com/1200x400',
-    title: '优惠活动'
+const bannerList = ref([])
+
+// 获取轮播图列表
+const fetchBanners = async () => {
+  try {
+    const params = new URLSearchParams({
+      index: 1,
+      size: 10,
+    })
+    const res = await request(`${API.BANNER.LIST}?${params}`)
+    bannerList.value = res.data || []
+  } catch (error) {
+    console.error('获取轮播图失败:', error)
   }
-])
+}
 
 // 特色菜品数据
-const featuredDishes = ref([
-  {
-    id: 1,
-    name: '宫保鸡丁',
-    price: 38.00,
-    image: 'https://via.placeholder.com/300x200'
-  },
-  {
-    id: 2,
-    name: '水煮鱼',
-    price: 88.00,
-    image: 'https://via.placeholder.com/300x200'
-  },
-  {
-    id: 3,
-    name: '麻婆豆腐',
-    price: 28.00,
-    image: 'https://via.placeholder.com/300x200'
-  },
-  {
-    id: 4,
-    name: '糖醋排骨',
-    price: 48.00,
-    image: 'https://via.placeholder.com/300x200'
+const featuredDishes = ref([])
+
+// 获取特色菜品列表
+const fetchFeaturedDishes = async () => {
+  try {
+    const params = new URLSearchParams({
+      index: 1,
+      size: 4,  // 显示4个特色菜品
+      main: 1   // 获取标记为特色的菜品
+    })
+    const res = await request(`${API.PRODUCT.LIST}?${params}`)
+    featuredDishes.value = res.data || []
+  } catch (error) {
+    console.error('获取特色菜品失败:', error)
   }
-])
+}
 
 const handleOrder = (dish) => {
   cartStore.addToCart(dish)
   router.push('/menu')
 }
+
+// 初始化
+onMounted(() => {
+  fetchBanners()
+  fetchFeaturedDishes()
+})
 </script>
 
 <style scoped>
@@ -206,5 +213,15 @@ const handleOrder = (dish) => {
   margin-right: 10px;
   font-size: 20px;
   color: #409EFF;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
 }
 </style> 

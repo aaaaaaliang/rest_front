@@ -1,355 +1,305 @@
 <template>
   <div class="salary-management">
+    <!-- 用户列表 -->
     <el-card>
       <template #header>
         <div class="card-header">
-          <div class="header-left">
+          <span>员工信息</span>
+          <div class="search-container">
             <el-input
-              v-model="searchQuery"
-              placeholder="搜索员工姓名"
-              style="width: 200px"
-              clearable
-              @clear="handleSearch"
+                v-model="searchQuery"
+                placeholder="搜索员工姓名"
+                clearable
+                @clear="fetchUsers"
+                style="width: 250px;"
             >
               <template #prefix>
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            
-            <el-date-picker
-              v-model="month"
-              type="month"
-              placeholder="选择月份"
-              style="margin-left: 16px; width: 200px"
-              @change="handleSearch"
-            />
-          </div>
-          
-          <div class="header-right">
-            <el-button type="success" @click="handleBatchPay">
-              批量发放工资
-            </el-button>
-            <el-button type="primary" @click="handleAddSalary">
-              新增工资记录
-            </el-button>
+            <el-button type="primary" @click="fetchUsersWithSearch">确认</el-button>
           </div>
         </div>
       </template>
 
-      <el-table 
-        :data="salaryList" 
-        style="width: 100%"
-        @selection-change="handleSelectionChange"
-      >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="employeeName" label="员工姓名" width="120" />
-        <el-table-column prop="department" label="部门" width="120" />
-        <el-table-column prop="position" label="职位" width="120" />
-        <el-table-column prop="baseSalary" label="基本工资">
+
+
+      <!-- 用户列表表格 -->
+      <el-table v-if="users.length > 0" :data="users" style="width: 100%" v-loading="loading">
+        <el-table-column prop="username" label="用户名" />
+        <el-table-column prop="email" label="邮箱" />
+        <el-table-column prop="phone" label="电话号码" />
+        <el-table-column prop="base_salary" label="基本工资" />
+        <el-table-column label="角色">
           <template #default="scope">
-            ¥{{ scope.row.baseSalary.toFixed(2) }}
+            <div v-if="scope.row.roles && scope.row.roles.length > 0">
+              <el-tag v-for="role in scope.row.roles" :key="role.code" type="primary">{{ role.name }}</el-tag>
+            </div>
+            <div v-else>-</div>
           </template>
         </el-table-column>
-        <el-table-column prop="bonus" label="奖金">
+        <el-table-column label="操作" width="250">
           <template #default="scope">
-            ¥{{ scope.row.bonus.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="deduction" label="扣款">
-          <template #default="scope">
-            ¥{{ scope.row.deduction.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="实发工资">
-          <template #default="scope">
-            ¥{{ (scope.row.baseSalary + scope.row.bonus - scope.row.deduction).toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="scope.row.status === 'paid' ? 'success' : 'warning'">
-              {{ scope.row.status === 'paid' ? '已发放' : '未发放' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="payTime" label="发放时间" width="180" />
-        <el-table-column label="操作" width="150">
-          <template #default="scope">
-            <el-button 
-              v-if="scope.row.status !== 'paid'"
-              size="small"
-              type="primary"
-              @click="handlePay(scope.row)"
-            >
-              发放
-            </el-button>
-            <el-button
-              size="small"
-              @click="handleEdit(scope.row)"
-            >
-              编辑
-            </el-button>
+            <el-button size="small" type="primary" @click="handleViewSalary(scope.row)">查看薪资记录</el-button>
+            <el-button size="small" type="success" @click="handlePay(scope.row)">发放工资</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
+      <!-- 没有数据时的提示 -->
+      <div v-else class="no-data-message">
+        <el-alert title="没有找到员工数据" type="info" />
       </div>
     </el-card>
 
-    <!-- 新增/编辑工资对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogType === 'add' ? '新增工资记录' : '编辑工资记录'"
-      width="600px"
-    >
-      <el-form
-        :model="salaryForm"
-        :rules="rules"
-        ref="salaryFormRef"
-        label-width="100px"
-      >
-        <el-form-item label="员工" prop="employeeId">
-          <el-select 
-            v-model="salaryForm.employeeId" 
-            style="width: 100%"
-            filterable
-          >
-            <el-option
-              v-for="employee in employees"
-              :key="employee.id"
-              :label="employee.name"
-              :value="employee.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="工资月份" prop="month">
-          <el-date-picker
-            v-model="salaryForm.month"
-            type="month"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="基本工资" prop="baseSalary">
-          <el-input-number
-            v-model="salaryForm.baseSalary"
-            :precision="2"
-            :step="100"
-            :min="0"
-            style="width: 100%"
-          />
+    <!-- 分页 -->
+    <div class="pagination-container">
+      <el-pagination
+          v-model:current-page="page.index"
+          v-model:page-size="page.size"
+          :total="page.total"
+          layout="total, sizes, prev, pager, next"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+      />
+    </div>
+
+    <!-- 发放工资对话框 -->
+    <el-dialog v-model="payDialogVisible" title="发放工资" width="400px">
+      <el-form ref="payFormRef" :model="payForm" label-width="100px">
+        <el-form-item label="基础工资" :prop="baseSalary">
+          <el-input-number v-model="selectedUser.base_salary" :disabled="true" style="width: 100%" />
         </el-form-item>
         <el-form-item label="奖金" prop="bonus">
-          <el-input-number
-            v-model="salaryForm.bonus"
-            :precision="2"
-            :step="100"
-            :min="0"
-            style="width: 100%"
-          />
+          <el-input-number v-model="payForm.bonus" :min="0" :precision="2" style="width: 100%" />
         </el-form-item>
         <el-form-item label="扣款" prop="deduction">
-          <el-input-number
-            v-model="salaryForm.deduction"
-            :precision="2"
-            :step="100"
-            :min="0"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="备注" prop="remarks">
-          <el-input
-            v-model="salaryForm.remarks"
-            type="textarea"
-            :rows="3"
-          />
+          <el-input-number v-model="payForm.deduction" :min="0" :precision="2" style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">
-            确定
-          </el-button>
-        </span>
+        <el-button @click="payDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPay">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 查看薪资记录的对话框 -->
+    <el-dialog v-model="viewSalaryDialogVisible" title="查看薪资记录" width="600px">
+      <!-- 时间筛选部分 -->
+      <div style="margin-bottom: 20px;">
+        <el-date-picker
+            v-model="startDate"
+            type="date"
+            placeholder="选择开始时间"
+            style="margin-right: 10px"
+        />
+        <el-date-picker
+            v-model="endDate"
+            type="date"
+            placeholder="选择结束时间"
+            style="margin-right: 10px"
+        />
+        <el-button type="primary" @click="filterByDate">确认</el-button>
+      </div>
+
+      <div v-if="salaryRecords.length > 0">
+        <el-table :data="salaryRecords" style="width: 100%">
+          <el-table-column prop="pay_date" label="发放日期" :formatter="formatDate" />
+          <el-table-column prop="bonus" label="奖金" />
+          <el-table-column prop="deduction" label="扣款" />
+          <el-table-column prop="total_salary" label="总薪资" />
+          <el-table-column label="操作">
+            <template #default="scope">
+              <el-button size="small" type="danger" @click="handleDeleteSalaryRecord(scope.row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div v-else>
+        <el-alert title="没有薪资记录" type="info" />
+      </div>
+      <template #footer>
+        <el-button @click="viewSalaryDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, onMounted } from 'vue';
+import { ElMessage } from 'element-plus';
+import { Search } from '@element-plus/icons-vue';
+import request from '../../utils/request'; // 自定义封装的请求方法
+import { API } from '@/config/api.js'; // API 配置文件
 
-// 员工数据
-const employees = ref([
-  { id: 1, name: '张三', department: '后厨', position: '厨师长' },
-  { id: 2, name: '李四', department: '前厅', position: '服务员' },
-  { id: 3, name: '王五', department: '后厨', position: '厨师' }
-])
-
-// 工资数据
-const salaryList = ref([
-  {
-    id: 1,
-    employeeName: '张三',
-    department: '后厨',
-    position: '厨师长',
-    baseSalary: 8000.00,
-    bonus: 2000.00,
-    deduction: 500.00,
-    status: 'pending',
-    payTime: ''
-  },
-  {
-    id: 2,
-    employeeName: '李四',
-    department: '前厅',
-    position: '服务员',
-    baseSalary: 5000.00,
-    bonus: 1000.00,
-    deduction: 200.00,
-    status: 'paid',
-    payTime: '2024-01-05 10:00:00'
-  }
-])
-
-const searchQuery = ref('')
-const month = ref(null)
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(100)
-const dialogVisible = ref(false)
-const dialogType = ref('add')
-const salaryFormRef = ref(null)
-const selectedRows = ref([])
-
-const salaryForm = reactive({
-  employeeId: '',
-  month: null,
-  baseSalary: 0,
+const loading = ref(false);
+const users = ref([]);
+const searchQuery = ref('');
+const page = ref({
+  index: 1,
+  size: 10,
+  total: 0
+});
+const payDialogVisible = ref(false); // 控制发放工资对话框
+const payForm = ref({
   bonus: 0,
-  deduction: 0,
-  remarks: ''
-})
+  deduction: 0
+});
+const selectedUser = ref(null); // 选择的员工对象
 
-const rules = {
-  employeeId: [
-    { required: true, message: '请选择员工', trigger: 'change' }
-  ],
-  month: [
-    { required: true, message: '请选择工资月份', trigger: 'change' }
-  ],
-  baseSalary: [
-    { required: true, message: '请输入基本工资', trigger: 'blur' }
-  ]
-}
+// 查看薪资记录的对话框
+const viewSalaryDialogVisible = ref(false);
+const salaryRecords = ref([]);
+const startDate = ref(null); // 时间选择框的开始日期
+const endDate = ref(null);   // 时间选择框的结束日期
 
-// 搜索和分页方法
-const handleSearch = () => {
-  // TODO: 实现搜索功能
-  console.log('搜索条件:', {
-    query: searchQuery.value,
-    month: month.value
-  })
-}
-
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  // TODO: 重新加载数据
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  // TODO: 重新加载数据
-}
-
-// 表格选择相关方法
-const handleSelectionChange = (rows) => {
-  selectedRows.value = rows
-}
-
-// 工资操作方法
-const handleAddSalary = () => {
-  dialogType.value = 'add'
-  Object.keys(salaryForm).forEach(key => {
-    salaryForm[key] = key.includes('Salary') || key.includes('bonus') || key.includes('deduction') ? 0 : ''
-  })
-  dialogVisible.value = true
-}
-
-const handleEdit = (row) => {
-  dialogType.value = 'edit'
-  const employee = employees.value.find(e => e.name === row.employeeName)
-  salaryForm.employeeId = employee?.id
-  salaryForm.baseSalary = row.baseSalary
-  salaryForm.bonus = row.bonus
-  salaryForm.deduction = row.deduction
-  dialogVisible.value = true
-}
-
-const handlePay = (row) => {
-  ElMessageBox.confirm(
-    `确定发放 ${row.employeeName} 的工资吗？`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
+// 获取用户列表
+const fetchUsers = async () => {
+  loading.value = true;
+  try {
+    const res = await request(API.USER.LIST + `?index=${page.value.index}&size=${page.value.size}&username=${searchQuery.value}&is_employee=true`);
+    if (res.data) {
+      users.value = res.data;
+      page.value.total = res.total;
+    } else {
+      users.value = [];
     }
-  ).then(() => {
-    // TODO: 调用发放API
-    row.status = 'paid'
-    row.payTime = new Date().toLocaleString()
-    ElMessage.success('发放成功')
-  })
-}
+  } catch (error) {
+    ElMessage.error(error.message || '获取用户列表失败');
+  } finally {
+    loading.value = false;
+  }
+};
 
-const handleBatchPay = () => {
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning('请选择要发放的工资记录')
-    return
+// 通过搜索框查询并获取员工数据
+const fetchUsersWithSearch = () => {
+  fetchUsers(); // 调用已有的 fetchUsers 方法进行查询
+};
+
+// 查看薪资记录
+const handleViewSalary = async (user) => {
+  selectedUser.value = user;
+  loading.value = true;
+
+  try {
+    let query = `?index=${page.value.index}&size=${page.value.size}&user_code=${user.code}`;
+
+    // 如果有时间选择，加入查询条件
+    if (startDate.value && endDate.value) {
+      const startTime = new Date(startDate.value).getTime();
+      const endTime = new Date(endDate.value).getTime();
+      query += `&start_time=${startTime}&end_time=${endTime}`;
+    }
+
+    const res = await request(API.SALARY.LIST + query);
+
+    if (res.data && res.data.length > 0) {
+      salaryRecords.value = res.data.map(record => ({
+        ...record,
+        pay_date: formatDate(record.pay_date),
+      }));
+    } else {
+      salaryRecords.value = [];
+    }
+    viewSalaryDialogVisible.value = true;
+  } catch (error) {
+    ElMessage.error('获取薪资记录失败');
+  } finally {
+    loading.value = false;
+  }
+};
+
+
+// 格式化时间戳或日期字符串为日期
+const formatDate = (payDate) => {
+  if (!payDate) {
+    return "-";  // 无效日期返回 "-"
   }
 
-  ElMessageBox.confirm(
-    `确定发放选中的 ${selectedRows.value.length} 条工资记录吗？`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    }
-  ).then(() => {
-    // TODO: 调用批量发放API
-    selectedRows.value.forEach(row => {
-      row.status = 'paid'
-      row.payTime = new Date().toLocaleString()
-    })
-    ElMessage.success('批量发放成功')
-  })
-}
+  // 如果是对象类型的 payDate，尝试提取日期字段
+  if (typeof payDate === "object") {
+    payDate = payDate.pay_date || payDate.timestamp || "";
+  }
 
-const handleSubmit = async () => {
-  if (!salaryFormRef.value) return
-  
-  await salaryFormRef.value.validate(async (valid) => {
-    if (valid) {
-      // TODO: 调用新增/编辑API
-      dialogVisible.value = false
-      ElMessage.success('保存成功')
-    }
-  })
-}
+  // 如果是字符串类型的日期，尝试转换为日期对象
+  if (typeof payDate === "string" && Date.parse(payDate)) {
+    const date = new Date(payDate);
+    return date.toLocaleDateString(); // 格式为 YYYY-MM-DD
+  }
+
+  // 如果是有效的时间戳（秒级或毫秒级）
+  if (!isNaN(payDate) && payDate > 0) {
+    const date = new Date(payDate);
+    return date.toLocaleDateString(); // 格式为 YYYY-MM-DD
+  }
+
+  return "-";
+};
+
+
+// 通过时间筛选薪资记录
+const filterByDate = () => {
+  if (startDate.value && endDate.value) {
+    handleViewSalary(selectedUser.value);
+  } else {
+    ElMessage.error('请选择开始和结束时间');
+  }
+};
+
+
+const handlePay = (user) => {
+  selectedUser.value = user;
+  payDialogVisible.value = true;
+};
+
+// 提交发放工资
+const submitPay = async () => {
+  try {
+    const res = await request(API.SALARY.CREATE, {
+      method: 'POST',
+      body: JSON.stringify({
+        user_code: selectedUser.value.code,
+        bonus: payForm.value.bonus,
+        deduction: payForm.value.deduction
+      })
+    });
+    ElMessage.success('工资发放成功');
+    payDialogVisible.value = false;
+    fetchUsers();
+  } catch (error) {
+    ElMessage.error('工资发放失败');
+  }
+};
+
+
+const handleDeleteSalaryRecord = async (salaryRecord) => {
+  try {
+    await request(API.SALARY.DELETE + `?code=${salaryRecord.code}`, {
+      method: 'DELETE'
+    });
+    ElMessage.success('薪资记录删除成功');
+    fetchUsers();
+  } catch (error) {
+    ElMessage.error('删除薪资记录失败');
+  }
+};
+
+// 分页大小变化
+const handleSizeChange = (size) => {
+  page.value.size = size;
+  fetchUsers();
+};
+
+// 当前页码变化
+const handleCurrentChange = (pageNumber) => {
+  page.value.index = pageNumber;
+  fetchUsers();
+};
+
+// 初始化数据
+onMounted(() => {
+  fetchUsers();
+});
 </script>
 
 <style scoped>
@@ -359,18 +309,18 @@ const handleSubmit = async () => {
 
 .card-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* 左右分布 */
   align-items: center;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
+.search-container {
+  display: flex; /* 输入框和按钮水平排列 */
+  gap: 10px; /* 设置间距 */
 }
 
-.header-right {
-  display: flex;
-  gap: 16px;
+.no-data-message {
+  padding: 20px;
+  text-align: center;
 }
 
 .pagination-container {
@@ -378,4 +328,4 @@ const handleSubmit = async () => {
   display: flex;
   justify-content: flex-end;
 }
-</style> 
+</style>

@@ -6,11 +6,11 @@ const routes = [
     name: 'Login',
     component: () => import('../views/Login.vue')
   },
-  {
-    path: '/register',
-    name: 'Register',
-    component: () => import('../views/Register.vue')
-  },
+  // {
+  //   path: '/register',
+  //   name: 'Register',
+  //   component: () => import('../views/Register.vue')
+  // },
   {
     path: '/admin',
     component: () => import('../layouts/AdminLayout.vue'),
@@ -22,15 +22,13 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'roles',
-        name: 'RoleManagement',
-        component: () => import('../views/admin/RoleManagement.vue'),
+        path: 'user',
+        component: () => import('../views/admin/UserManagement.vue'),
         meta: { requiresAuth: true }
       },
       {
-        path: 'users',
-        name: 'UserManagement',
-        component: () => import('../views/admin/UserManagement.vue'),
+        path: 'role',
+        component: () => import('../views/admin/RoleManagement.vue'),
         meta: { requiresAuth: true }
       },
       {
@@ -68,6 +66,22 @@ const routes = [
         name: 'ImageManagement',
         component: () => import('../views/admin/ImageManagement.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'categories',
+        name: 'CategoryManagement',
+        component: () => import('../views/admin/CategoryManagement.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'banners',
+        name: 'BannerManagement',
+        component: () => import('../views/admin/BannerManagement.vue'),
+        meta: { 
+          requiresAuth: true,
+          requiresAdmin: true,
+          title: '轮播图管理'
+        }
       }
     ]
   },
@@ -101,8 +115,33 @@ const routes = [
         name: 'Profile',
         component: () => import('../views/client/Profile.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'checkout',
+        name: 'Checkout',
+        component: () => import('../views/client/Checkout.vue'),
+        meta: { requiresAuth: true }
       }
     ]
+  },
+  // 用户端订单页面
+  {
+    path: '/my-orders',
+    component: () => import('../views/client/MyOrders.vue'),
+    meta: {
+      requiresAuth: true,
+      title: '我的订单'
+    }
+  },
+  // 管理端订单页面
+  {
+    path: '/admin/orders',
+    component: () => import('../views/admin/OrderManagement.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: '订单管理'
+    }
   }
 ]
 
