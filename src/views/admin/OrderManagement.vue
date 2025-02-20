@@ -67,7 +67,7 @@
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <el-button 
-              v-if="row.status === ORDER_STATUS.PENDING"
+              v-if="row.status === ORDER_STATUS.PENDING && hasPermission('api_order_put')"
               type="primary" 
               link
               @click="handleUpdateStatus(row, ORDER_STATUS.PROCESSING)"
@@ -75,7 +75,7 @@
               开始制作
             </el-button>
             <el-button 
-              v-if="row.status === ORDER_STATUS.PROCESSING"
+              v-if="row.status === ORDER_STATUS.PROCESSING && hasPermission('api_order_put')"
               type="success" 
               link
               @click="handleUpdateStatus(row, ORDER_STATUS.COMPLETED)"
@@ -83,7 +83,7 @@
               完成制作
             </el-button>
             <el-button 
-              v-if="row.status === ORDER_STATUS.PENDING"
+              v-if="row.status === ORDER_STATUS.PENDING && hasPermission('api_order_put')"
               type="danger" 
               link
               @click="handleUpdateStatus(row, ORDER_STATUS.FAILED)"
@@ -94,6 +94,7 @@
               type="primary" 
               link
               @click="handleEdit(row)"
+              v-if="hasPermission('api_order_put')"
             >
               编辑
             </el-button>
@@ -144,6 +145,7 @@
               placeholder="请输入备注信息"
             />
           </el-form-item>
+          <input type="hidden" v-model="form.version" />
         </el-form>
         <template #footer>
           <el-button @click="dialogVisible = false">取消</el-button>
@@ -163,6 +165,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Picture } from '@element-plus/icons-vue'
 import { ORDER_STATUS, ORDER_STATUS_MAP } from '../../config/constants'
 import { IMAGE_SIZE, getImageUrl } from '../../config/constants'
+import request from '../../utils/request'
+import { API } from '../../config/api'
+import { hasPermission } from '../../utils/permissions'
 
 const orderStore = useOrderStore()
 const loading = ref(false)
@@ -176,14 +181,16 @@ const total = ref(0)
 const queryParams = reactive({
   index: 1,
   size: 10,
-  status: ''
+  status: '',
+  all: true
 })
 
 // 表单数据
 const form = ref({
   code: '',
   status: '',
-  remark: ''
+  remark: '',
+  version: 1
 })
 
 // 表单校验规则
@@ -195,26 +202,50 @@ const rules = {
 const fetchOrders = async () => {
   loading.value = true
   try {
-    await orderStore.fetchOrders(queryParams)
-    orders.value = orderStore.orders
-    total.value = orderStore.total
+    const params = new URLSearchParams({
+      index: queryParams.index,
+      size: queryParams.size,
+      all: true
+    })
+    if (queryParams.status) {
+      params.append('status', queryParams.status)
+    }
+    
+    const res = await request(`${API.ORDER.LIST}?${params}`)
+    if (res.data && res.data.code === 200) {
+      orders.value = res.data.data || []
+      total.value = res.data.total || 0
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '获取订单列表失败')
   } finally {
     loading.value = false
   }
 }
 
-// 处理状态更新
+// 更新订单状态
 const handleUpdateStatus = async (order, status) => {
   try {
-    const success = await orderStore.updateOrder({
-      code: order.code,
-      status
+    const res = await request(API.ORDER.UPDATE, {
+      method: 'PUT',
+      data: {
+        code: order.code,
+        status,
+        version: order.version
+      }
     })
-    if (success) {
+    
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('更新成功')
       fetchOrders()
     }
   } catch (error) {
-    // 错误已在 store 中处理
+    if (error.response?.data?.message === '数据已被其他操作修改') {
+      ElMessage.error('订单状态已被其他操作修改，请刷新后重试')
+      fetchOrders()
+    } else {
+      ElMessage.error(error.message || '更新失败')
+    }
   }
 }
 
@@ -223,7 +254,8 @@ const handleEdit = (row) => {
   form.value = {
     code: row.code,
     status: row.status,
-    remark: row.remark || ''
+    remark: row.remark || '',
+    version: row.version
   }
   dialogVisible.value = true
 }
@@ -236,10 +268,23 @@ const handleSubmit = async () => {
     if (valid) {
       submitting.value = true
       try {
-        const success = await orderStore.updateOrder(form.value)
-        if (success) {
+        const res = await request(API.ORDER.UPDATE, {
+          method: 'PUT',
+          data: form.value
+        })
+        
+        if (res.data && res.data.code === 200) {
+          ElMessage.success('更新成功')
           dialogVisible.value = false
           fetchOrders()
+        }
+      } catch (error) {
+        if (error.response?.data?.message === '数据已被其他操作修改') {
+          ElMessage.error('订单信息已被其他操作修改，请刷新后重试')
+          dialogVisible.value = false
+          fetchOrders()
+        } else {
+          ElMessage.error(error.message || '更新失败')
         }
       } finally {
         submitting.value = false

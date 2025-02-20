@@ -19,7 +19,11 @@
               />
             </el-select>
           </div>
-          <el-button type="primary" @click="handleAdd">
+          <el-button 
+            type="primary" 
+            @click="handleAdd"
+            v-if="hasPermission('api_product_post')"
+          >
             新增菜品
           </el-button>
         </div>
@@ -60,6 +64,7 @@
               type="primary" 
               link
               @click="handleEdit(row)"
+              v-if="hasPermission('api_product_put')"
             >
               编辑
             </el-button>
@@ -71,6 +76,7 @@
                 <el-button 
                   type="danger" 
                   link
+                  v-if="hasPermission('api_product_delete')"
                 >
                   删除
                 </el-button>
@@ -114,7 +120,16 @@
             :max-size="5"
             tip="支持 jpg、png、gif 格式，大小不超过5MB"
             @success="handleUploadSuccess"
-          />
+          >
+            <template #preview>
+              <el-image
+                v-if="form.picture.code"
+                :src="form.picture.code"
+                fit="cover"
+                style="width: 200px; height: 200px"
+              />
+            </template>
+          </upload-file>
         </el-form-item>
 
         <el-form-item label="菜品名称" prop="products_name">
@@ -201,6 +216,7 @@ import { useCategoryStore } from '../../stores/category'
 import UploadFile from '../../components/UploadFile.vue'
 import request from '../../utils/request'
 import { API } from '../../config/api'
+import { hasPermission } from '../../utils/permissions'
 
 const categoryStore = useCategoryStore()
 const loading = ref(false)
@@ -263,8 +279,10 @@ const fetchList = async () => {
     }
     
     const res = await request(`${API.PRODUCT.LIST}?${params}`)
-    tableData.value = res.data || []
-    total.value = res.total || 0
+    if (res.data && res.data.code === 200) {
+      tableData.value = res.data.data || []  // 使用 res.data.data 作为表格数据
+      total.value = res.data.total || 0      // 从响应中获取总数
+    }
   } catch (error) {
     ElMessage.error(error.message || '获取列表失败')
   } finally {
@@ -308,10 +326,17 @@ const filterCategories = computed(() => {
 })
 
 // 修改上传成功的处理
-const handleUploadSuccess = (data) => {
-  form.value.picture = {
-    code: data.url,
-    name: data.filename
+const handleUploadSuccess = (res) => {
+  console.log('上传响应:', res)  // 添加日志
+  if (res.code === 200 && res.data) {
+    form.value.picture = {
+      code: res.data.url,
+      name: res.data.filename
+    }
+    console.log('更新后的表单:', form.value)  // 添加日志
+    ElMessage.success('图片上传成功')
+  } else {
+    ElMessage.error(res.message || '上传失败')
   }
 }
 
@@ -325,7 +350,7 @@ const initForm = () => ({
   describe: '',
   main: 0,
   picture: {
-    code: '',
+    code: '',  // 确保初始化时有这个字段
     name: ''
   }
 })
@@ -343,22 +368,25 @@ const handleEdit = (row) => {
   form.value = {
     ...row,
     main: row.main || 0,
-    picture: row.picture || {
-      code: '',
-      name: ''
+    picture: {
+      code: row.picture?.code || '',  // 确保有 code
+      name: row.picture?.name || ''
     }
   }
+  console.log('编辑表单数据:', form.value)  // 添加日志
   dialogVisible.value = true
 }
 
 // 删除菜品
 const handleDelete = async (code) => {
   try {
-    await request(`${API.PRODUCT.DELETE}?code=${code}`, {
+    const res = await request(`${API.PRODUCT.DELETE}?code=${code}`, {
       method: 'DELETE'
     })
-    ElMessage.success('删除成功')
-    fetchList()
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('删除成功')
+      fetchList()
+    }
   } catch (error) {
     ElMessage.error(error.message || '删除失败')
   }
@@ -378,26 +406,22 @@ const handleSubmit = async () => {
         // 构建提交数据
         const submitData = {
           ...form.value,
-          // 只有当有图片code和name时才传递picture对象
           picture: form.value.picture?.code && form.value.picture?.name ? {
             code: form.value.picture.code,
             name: form.value.picture.name
-          } : undefined  // 改为 undefined 而不是 null
+          } : undefined
         }
 
-        // 如果是编辑模式，确保传递code
-        if (dialogType.value === 'edit') {
-          submitData.code = form.value.code
-        }
-
-        await request(api, {
+        const res = await request(api, {
           method,
-          body: JSON.stringify(submitData)
+          data: submitData
         })
         
-        ElMessage.success(dialogType.value === 'add' ? '创建成功' : '更新成功')
-        dialogVisible.value = false
-        fetchList()
+        if (res.data && res.data.code === 200) {
+          ElMessage.success(dialogType.value === 'add' ? '创建成功' : '更新成功')
+          dialogVisible.value = false
+          fetchList()
+        }
       } catch (error) {
         ElMessage.error(error.message || '操作失败')
       } finally {

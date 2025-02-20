@@ -4,7 +4,11 @@
       <template #header>
         <div class="card-header">
           <span>分类管理</span>
-          <el-button type="primary" @click="handleAdd(null)">
+          <el-button 
+            type="primary" 
+            @click="handleAdd(null)"
+            v-if="hasPermission('api_category_post')"
+          >
             新增顶级分类
           </el-button>
         </div>
@@ -32,6 +36,7 @@
               type="primary" 
               link
               @click="handleAdd(row.code)"
+              v-if="hasPermission('api_category_post')"
             >
               添加子分类
             </el-button>
@@ -39,6 +44,7 @@
               type="primary" 
               link
               @click="handleEdit(row)"
+              v-if="hasPermission('api_category_put')"
             >
               编辑
             </el-button>
@@ -50,6 +56,7 @@
                 <el-button 
                   type="danger" 
                   link
+                  v-if="hasPermission('api_category_delete')"
                 >
                   删除
                 </el-button>
@@ -95,6 +102,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCategoryStore } from '../../stores/category'
+import { hasPermission } from '../../utils/permissions'  // 导入权限检查函数
 
 const categoryStore = useCategoryStore()
 const dialogVisible = ref(false)
@@ -175,8 +183,9 @@ const handleEdit = (row) => {
   dialogType.value = 'edit'
   form.value = {
     code: row.code,
+    parent_code: row.parent_code || '',
     category_name: row.CategoryName,
-    sort: row.Sort
+    sort: row.Sort || 1
   }
   dialogVisible.value = true
 }
@@ -199,16 +208,30 @@ const handleSubmit = async () => {
     if (valid) {
       submitting.value = true
       try {
+        const submitData = {
+          parent_code: form.value.parent_code || '',
+          category_name: form.value.category_name,
+          sort: Number(form.value.sort)
+        }
+
+        console.log('提交数据:', submitData)
+
         if (dialogType.value === 'add') {
-          await categoryStore.createCategory(form.value)
+          const res = await categoryStore.createCategory(submitData)
+          console.log('创建响应:', res)
           ElMessage.success('创建成功')
         } else {
-          await categoryStore.updateCategory(form.value)
+          const res = await categoryStore.updateCategory({
+            ...submitData,
+            code: form.value.code
+          })
+          console.log('更新响应:', res)
           ElMessage.success('更新成功')
         }
         dialogVisible.value = false
       } catch (error) {
-        ElMessage.error(error.message)
+        console.error('操作失败:', error)
+        ElMessage.error(error.message || '操作失败')
       } finally {
         submitting.value = false
       }

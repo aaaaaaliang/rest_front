@@ -1,9 +1,14 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useThemeStore } from './stores/theme'
-import HelloWorld from './components/HelloWorld.vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from './stores/user'
+import { UserFilled, Avatar } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const themeStore = useThemeStore()
+const router = useRouter()
+const userStore = useUserStore()
 
 onMounted(() => {
   // 初始化主题
@@ -17,10 +22,40 @@ onMounted(() => {
   // 设置主题监听
   themeStore.setupThemeListener()
 })
+
+// 处理下拉菜单命令
+const handleCommand = async (command) => {
+  if (command === 'logout') {
+    await userStore.logout()
+    ElMessage.success('退出登录成功')
+    router.push('/login')
+  }
+}
+
+// 获取角色名称
+const getRoleName = (roleCode) => {
+  const roleMap = {
+    'admin': '管理员',
+    'user': '普通用户',
+    // 可以添加更多角色映射
+  }
+  return roleMap[roleCode] || roleCode
+}
+
+const handleLogout = async () => {
+  await userStore.logout()
+  ElMessage.success('退出登录成功')
+  router.push('/login')
+}
 </script>
 
 <template>
-  <router-view></router-view>
+  <div class="app-container">
+  
+
+    <!-- 主内容区 -->
+    <router-view></router-view>
+  </div>
 </template>
 
 <style>
@@ -34,6 +69,12 @@ onMounted(() => {
   --border-color: #e4e7ed;
   --card-bg: #ffffff;
   --hover-bg: #f5f7fa;
+  
+  /* 图表主题变量 */
+  --chart-bg: var(--card-bg);
+  --chart-text: var(--text-color);
+  --chart-axis: var(--text-color-secondary);
+  --chart-grid: var(--border-color);
 }
 
 /* 深色主题变量 */
@@ -59,6 +100,15 @@ html.dark {
   /* 其他 Element Plus 变量... */
   --el-mask-color: rgba(0, 0, 0, 0.8);
   --el-mask-color-extra-light: rgba(0, 0, 0, 0.3);
+  
+  /* 图表深色主题变量 */
+  --chart-bg: var(--card-bg);
+  --chart-text: var(--text-color);
+  --chart-axis: var(--text-color-secondary);
+  --chart-grid: var(--border-color);
+
+  /* 卡片深色主题 */
+  --el-card-bg-color: var(--el-bg-color);
 }
 
 /* 全局基础样式 */
@@ -135,5 +185,75 @@ body {
 /* 过渡动画 */
 * {
   transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  height: 60px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    img {
+      height: 32px;
+    }
+
+    span {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .user-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.3s;
+
+    &:hover {
+      background: var(--el-fill-color-light);
+    }
+
+    .username {
+      font-size: 14px;
+      color: var(--el-text-color-regular);
+    }
+  }
+}
+
+.role-info {
+  padding: 4px 0;
+  min-width: 120px;
+
+  .title {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    margin-bottom: 8px;
+  }
+
+  .role-tag {
+    margin-right: 4px;
+    margin-bottom: 4px;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
 }
 </style>

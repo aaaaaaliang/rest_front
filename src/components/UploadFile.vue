@@ -3,9 +3,8 @@
     <el-upload
       :action="`${API.BASE_URL}${API.UPLOAD.FILE}`"
       :show-file-list="false"
+      :http-request="customUpload"
       :before-upload="handleBeforeUpload"
-      :on-success="handleSuccess"
-      :on-error="handleError"
       :accept="accept"
       name="file"
     >
@@ -39,13 +38,7 @@
     </el-upload>
 
     <div class="actions" v-if="modelValue">
-      <el-button 
-        type="danger" 
-        link 
-        @click="handleRemove"
-      >
-        删除
-      </el-button>
+      <el-button type="danger" link @click="handleRemove">删除</el-button>
     </div>
   </div>
 </template>
@@ -98,31 +91,40 @@ const imageStyle = computed(() => ({
   height: typeof props.height === 'number' ? `${props.height}px` : props.height
 }))
 
+// 自定义上传方法
+const customUpload = async ({ file }) => {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await fetch(`${API.BASE_URL}${API.UPLOAD.FILE}`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    })
+    
+    const res = await response.json()
+    
+    if (res.code === 200 && res.data && res.data.url) {
+      emit('update:modelValue', res.data.url)
+      emit('success', res)
+      ElMessage.success('上传成功')
+    } else {
+      throw new Error(res.message || '上传失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '上传失败')
+  }
+}
+
 // 上传前验证
 const handleBeforeUpload = (file) => {
-  // 检查文件大小
   const isLtMax = file.size / 1024 / 1024 < props.maxSize
   if (!isLtMax) {
     ElMessage.error(`文件大小不能超过 ${props.maxSize}MB!`)
     return false
   }
   return true
-}
-
-// 上传成功
-const handleSuccess = (res) => {
-  if (res.code === 200) {
-    emit('update:modelValue', res.data.url)
-    emit('success', res.data)
-    ElMessage.success('上传成功')
-  } else {
-    ElMessage.error(res.message || '上传失败')
-  }
-}
-
-// 上传失败
-const handleError = () => {
-  ElMessage.error('上传失败')
 }
 
 // 删除文件

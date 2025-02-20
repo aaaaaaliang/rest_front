@@ -6,7 +6,11 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './assets/styles/common.scss'
-import { vPermission } from './directives/permission'
+import { permission } from './directives/permission'
+import { setRouter } from './utils/request'
+
+// 设置路由实例
+setRouter(router)
 
 const app = createApp(App)
 
@@ -18,6 +22,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus)
-app.directive('permission', vPermission)
+app.directive('permission', permission)
+
+// 添加版本号到 window 对象
+window.__APP_VERSION__ = Date.now()
 
 app.mount('#app')

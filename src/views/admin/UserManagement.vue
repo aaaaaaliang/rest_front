@@ -8,7 +8,7 @@
           </div>
           <div class="header-right">
             <el-button 
-            
+              v-if="hasPermission('api_user_post')"
               type="primary" 
               @click="handleAdd"
             >
@@ -58,36 +58,36 @@
           </template>
         </el-table-column>
         <el-table-column label="操作" width="320">
-  <template #default="scope">
-    <el-button 
-      size="small"
-      type="warning"
-      link
-      @click="handleEdit(scope.row)"
-    >
-      编辑
-    </el-button>
-    <el-button
-      size="small"
-      type="danger"
-      link
-      @click="handleDelete(scope.row)"
-    >
-      删除
-    </el-button>
-    <el-button
-      size="small"
-      type="primary"
-      link
-      @click="handleAssignRole(scope.row)"
-    >
-      分配角色
-    </el-button>
-  </template>
-</el-table-column>
-
-
-        
+          <template #default="scope">
+            <el-button 
+              v-if="hasPermission('api_user_put')"
+              size="small"
+              type="warning"
+              link
+              @click="handleEdit(scope.row)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              v-if="hasPermission('api_user_delete')"
+              size="small"
+              type="danger"
+              link
+              @click="handleDelete(scope.row)"
+            >
+              删除
+            </el-button>
+            <el-button
+              v-if="hasPermission('api_user_assign_post')"
+              size="small"
+              type="primary"
+              link
+              @click="handleAssignRole(scope.row)"
+            >
+              分配角色
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
@@ -184,9 +184,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
+import { useUserStore } from '../../stores/user'
 import request from '../../utils/request'
 import { API } from '../../config/api'
+import { hasPermission } from '../../utils/permissions'
 
+const userStore = useUserStore()
 const loading = ref(false)
 const userFormRef = ref(null)
 const dialogVisible = ref(false)
@@ -243,8 +246,10 @@ const fetchUsers = async () => {
   loading.value = true
   try {
     const res = await request(API.USER.LIST + `?index=${page.index}&size=${page.size}&username=${searchForm.username}`)
-    users.value = res.data
-    page.total = res.total
+    if (res.data && res.data.code === 200) {
+      users.value = res.data.data  // 使用 res.data.data 作为用户列表数据
+      page.total = res.data.total  // 从响应中获取总数
+    }
   } catch (error) {
     ElMessage.error(error.message || '获取用户列表失败')
   } finally {
@@ -262,7 +267,9 @@ const convertBaseSalary = () => {
 const fetchRoles = async () => {
   try {
     const res = await request(API.ROLE.LIST)
-    roles.value = res.data || []
+    if (res.data && res.data.code === 200) {
+      roles.value = res.data.data || []  // 使用 res.data.data 作为角色列表数据
+    }
   } catch (error) {
     ElMessage.error(error.message || '获取角色列表失败')
   }
@@ -272,10 +279,12 @@ const fetchRoles = async () => {
 const fetchUserRoles = async (userCode) => {
   try {
     const res = await request(`${API.USER.GET_ROLES}?user_code=${userCode}`)
-    roles.value = res.data || []
-    selectedRoles.value = roles.value
-      .filter(role => role.checked)
-      .map(role => role.code)
+    if (res.data && res.data.code === 200) {
+      roles.value = res.data.data || []  // 使用 res.data.data 作为角色列表数据
+      selectedRoles.value = roles.value
+        .filter(role => role.checked)
+        .map(role => role.code)
+    }
   } catch (error) {
     ElMessage.error(error.message || '获取用户角色失败')
   }
@@ -325,7 +334,7 @@ const handleDelete = async (row) => {
     await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
       type: 'warning'
     })
-    await request(`${API.USER.DELETE}/${row.id}`, {
+    await request(API.USER.DELETE + `/${row.id}`, {
       method: 'DELETE'
     })
     ElMessage.success('删除成功')
@@ -337,111 +346,93 @@ const handleDelete = async (row) => {
   }
 }
 
-
 // 提交表单
-// const handleSubmit = async () => {
-//   try {
-//     if (dialogType.value === 'add') {
-//       await request(API.USER.CREATE, {
-//         method: 'POST',
-//         body: JSON.stringify(userForm.value)
-//       })
-//     } else {
-//       await request(`${API.USER.UPDATE}/${userForm.value.id}`, {
-//         method: 'PUT',
-//         body: JSON.stringify(userForm.value)
-//       })
-//     }
-//     ElMessage.success(dialogType.value === 'add' ? '新增成功' : '编辑成功')
-//     dialogVisible.value = false
-//     fetchUsers()
-//   } catch (error) {
-//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败')
-//   }
-// }
-
 const handleSubmit = async () => {
   try {
     if (userForm.value.is_employee && userForm.value.base_salary) {
-      userForm.value.base_salary = parseFloat(userForm.value.base_salary);
+      userForm.value.base_salary = parseFloat(userForm.value.base_salary)
     }
 
-    await request(API.USER.CREATE, {
-      method: 'POST',
-      body: JSON.stringify(userForm.value) // 直接提交转换后的数据
-    });
+    if (dialogType.value === 'add') {
+      await request(API.USER.ADDUSER, {
+        method: 'POST',
+        data: userForm.value
+      })
+      ElMessage.success('新增成功')
+    } else {
+      await request(API.USER.UPDATE + `/${userForm.value.id}`, {
+        method: 'PUT',
+        data: userForm.value
+      })
+      ElMessage.success('编辑成功')
+    }
 
-    ElMessage.success('新增成功');
-    dialogVisible.value = false;
-    fetchUsers();
+    dialogVisible.value = false
+    fetchUsers()
   } catch (error) {
-    ElMessage.error('新增失败');
+    ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败')
   }
-};
-
+}
 
 // 分配角色
-// const handleAssignRole = async (row) => {
-//   currentUser.value = row
-//   try {
-//     const res = await request(`${API.USER.GET_ROLES}/${row.code}`)
-//     selectedRoles.value = res.data.map(role => role.id)
-//     roleDialogVisible.value = true
-//   } catch (error) {
-//     ElMessage.error('获取用户角色失败')
-//   }
-// }
-
-
 const handleAssignRole = async (row) => {
-  const userCode = row.user_code || row.code; // 确保 user_code 正确
+  const userCode = row.user_code || row.code
 
   if (!userCode) {
-    ElMessage.error("用户数据异常，无法获取角色");
-    return;
+    ElMessage.error('用户数据异常，无法获取角色')
+    return
   }
 
-  currentUser.value = row;
+  currentUser.value = row
 
   try {
-    const res = await request(`${API.USER.GET_ROLES}?user_code=${userCode}`);
+    // 获取所有角色列表
+    const res = await request(`${API.USER.GET_ROLES}?user_code=${userCode}`)
+    if (res.data && res.data.code === 200) {
+      // 设置角色列表
+      roles.value = res.data.data
 
-    // **只选中 checked 为 true 的角色**
-    selectedRoles.value = res.data
-      .filter(role => role.checked) // 过滤出 checked: true 的角色
-      .map(role => role.code);      // 只取 role.code 作为选中的角色
-
-    roleDialogVisible.value = true;
+      // 设置已选中的角色
+      selectedRoles.value = row.roles ? row.roles.map(role => role.code) : []
+      
+      // 打开对话框
+      roleDialogVisible.value = true
+    }
   } catch (error) {
-    ElMessage.error("获取用户角色失败");
+    console.error('获取角色列表失败:', error)
+    ElMessage.error('获取角色列表失败')
   }
-};
+}
 
-
+// 提交角色分配
 const handleSubmitRoles = async () => {
   if (!currentUser.value || !currentUser.value.code) {
-    ElMessage.error("用户信息错误，无法分配角色");
-    return;
+    ElMessage.error('用户信息错误，无法分配角色')
+    return
   }
-
-  const userCode = currentUser.value.code; // 这里确保 user_code 正确
 
   try {
-    await request(API.USER.ASSIGN_ROLES, {
+    const res = await request(API.USER.ASSIGN_ROLES, {
       method: 'POST',
-      body: JSON.stringify({
-        user_code: userCode, // 传正确的 user_code
-        role_codes: selectedRoles.value, // 传角色 code 数组
-      })
-    });
-    ElMessage.success('角色分配成功');
-    roleDialogVisible.value = false;
-    fetchUsers(); // 重新获取用户列表，刷新页面
-  } catch (error) {
-    ElMessage.error('角色分配失败');
-  }
-};
+      data: {
+        user_code: currentUser.value.code,
+        role_codes: selectedRoles.value
+      }
+    })
 
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('角色分配成功')
+      roleDialogVisible.value = false
+      // 刷新用户列表
+      await fetchUsers()
+    } else {
+      throw new Error(res.data?.message || '分配失败')
+    }
+  } catch (error) {
+    console.error('分配角色失败:', error)
+    ElMessage.error(error.message || '分配角色失败')
+  }
+}
 
 // 初始化
 onMounted(() => {
@@ -453,6 +444,54 @@ onMounted(() => {
 <style scoped>
 .user-management {
   padding: 20px;
+}
+
+/* 调试面板样式 */
+.debug-panel {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.debug-item {
+  margin: 10px 0;
+  padding: 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.debug-json {
+  background: #f5f7fa;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 12px;
+}
+
+h4 {
+  margin: 20px 0 10px;
+  color: #606266;
+}
+
+/* 确保按钮可见性 */
+.el-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 修复按钮间距 */
+.el-button + .el-button {
+  margin-left: 10px;
+}
+
+/* 确保操作列宽度足够 */
+:deep(.el-table__row) {
+  .cell {
+    white-space: nowrap;
+  }
 }
 
 .card-header {
@@ -480,5 +519,4 @@ onMounted(() => {
   margin-right: 5px;
   margin-bottom: 5px;
 }
-
-</style> 
+</style>

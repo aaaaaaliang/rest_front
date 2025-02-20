@@ -15,8 +15,8 @@
         :text-color="menuStyle.textColor"
         :active-text-color="menuStyle.activeTextColor"
       >
-        <template v-for="menu in menus" :key="menu.code">
-          <el-menu-item :index="menu.path">
+        <template v-for="menu in menus" :key="menu.path">
+          <el-menu-item :index="menu.path" @click="handleMenuClick(menu)">
             <el-icon><component :is="menu.icon" /></el-icon>
             <span>{{ menu.name }}</span>
           </el-menu-item>
@@ -62,23 +62,51 @@
 
           <el-dropdown>
             <span class="el-dropdown-link">
-              <el-avatar 
-                :size="32" 
-                :src="userInfo?.avatar" 
-                :icon="User"
-              />
-              <span class="username">{{ userInfo?.username }}</span>
+              <el-avatar :size="32" :icon="UserFilled" />
+              <span class="username">{{ userStore.user?.username }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="showUserInfoDialog = true">
-                  <el-icon><User /></el-icon>
-                  <span>个人信息</span>
+                <el-dropdown-item disabled>
+                  <div class="user-info">
+                    <div class="info-item">
+                      <span class="label">用户名：</span>
+                      <span>{{ userStore.user?.username }}</span>
+                    </div>
+                    <div class="info-item" v-if="userStore.user?.nickname">
+                      <span class="label">昵称：</span>
+                      <span>{{ userStore.user.nickname }}</span>
+                    </div>
+                    <div class="info-item" v-if="userStore.user?.email">
+                      <span class="label">邮箱：</span>
+                      <span>{{ userStore.user.email }}</span>
+                    </div>
+                    <div class="info-item" v-if="userStore.user?.phone">
+                      <span class="label">电话：</span>
+                      <span>{{ userStore.user.phone }}</span>
+                    </div>
+                    <!-- <div class="info-item">
+                      <span class="label">角色：</span>
+                      <el-tag 
+                        v-for="role in userStore.roles" 
+                        :key="role" 
+                        size="small"
+                        class="role-tag"
+                      >
+                        {{ role }}
+                      </el-tag>
+                    </div> -->
+                  </div>
                 </el-dropdown-item>
-                <el-dropdown-item @click="handleLogout">
-                  <el-icon><SwitchButton /></el-icon>
-                  <span>退出登录</span>
+                <el-dropdown-item @click="showUserInfoDialog = true">
+                  <div class="edit-profile">
+                    <el-icon><User /></el-icon>
+                    <span>编辑资料</span>
+                  </div>
+                </el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">
+                  退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -172,7 +200,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, markRaw } from 'vue'
+import { ref, computed, reactive, onMounted, markRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   DataLine,
@@ -299,14 +327,44 @@ const switchTheme = (mode) => {
 
 // 更新用户信息
 const handleUpdateUserInfo = async () => {
+  if (!userFormRef.value) return
+  
   try {
-    // TODO: 调用更新API
-    ElMessage.success('个人信息更新成功')
+    await userFormRef.value.validate()
+    const updateData = {
+      nickname: userForm.value.nickname,
+      phone: userForm.value.phone,
+      email: userForm.value.email
+    }
+
+    if (userForm.value.newPassword) {
+      updateData.old_password = userForm.value.oldPassword
+      updateData.new_password = userForm.value.newPassword
+    }
+
+    await userStore.updateUserInfo(updateData)
+    ElMessage.success('更新成功')
     showUserInfoDialog.value = false
   } catch (error) {
-    ElMessage.error('更新失败')
+    console.error('更新失败:', error)
+    ElMessage.error(error.message || '更新失败')
   }
 }
+
+// 监听对话框打开，初始化表单数据
+watch(showUserInfoDialog, (newVal) => {
+  if (newVal) {
+    userForm.value = {
+      username: userStore.user?.username || '',
+      nickname: userStore.user?.nickname || '',
+      phone: userStore.user?.phone || '',
+      email: userStore.user?.email || '',
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    }
+  }
+})
 
 // 头像上传
 const handleAvatarSuccess = (response) => {
@@ -328,63 +386,81 @@ const beforeAvatarUpload = (file) => {
   return true
 }
 
-// 定义菜单数据
-const menus = ref([
+// 定义菜单配置，使用后端返回的模块代码
+const menuConfig = [
   {
-    code: 'dashboard',
-    name: '仪表盘',
     path: '/admin/dashboard',
-    icon: markRaw(DataLine)
+    name: '仪表盘',
+    icon: 'Odometer',
+    moduleCode: 'dashboard'  // 对应后端的模块code
   },
   {
-    code: 'user',
-    name: '用户管理',
     path: '/admin/user',
-    icon: markRaw(User)
+    name: '用户管理',
+    icon: 'User',
+    moduleCode: 'user'
   },
   {
-    code: 'role',
-    name: '角色管理',
     path: '/admin/role',
-    icon: markRaw(Lock)
+    name: '角色管理',
+    icon: 'Lock',
+    moduleCode: 'role'
   },
   {
-    code: 'dishes',
-    name: '菜品管理',
+    path: '/admin/categories',
+    name: '分类管理',
+    icon: 'Menu',
+    moduleCode: 'category'  // 注意这里是 product 而不是 dishes
+  },
+  {
     path: '/admin/dishes',
-    icon: markRaw(Food)
+    name: '菜品管理',
+    icon: 'Food',
+    moduleCode: 'product'  // 注意这里是 product 而不是 dishes
   },
   {
-    code: 'orders',
-    name: '订单管理',
     path: '/admin/orders',
-    icon: markRaw(List)
+    name: '订单管理',
+    icon: 'List',
+    moduleCode: 'order'
   },
   {
-    code: 'salary',
-    name: '工资管理',
     path: '/admin/salary',
-    icon: markRaw(Money)
+    name: '工资管理',
+    icon: 'Money',
+    moduleCode: 'salary'
   },
   {
-    code: 'customer-service',
-    name: '客服管理',
     path: '/admin/customer-service',
-    icon: markRaw(Service)
+    name: '客服管理',
+    icon: 'Service',
+    moduleCode: 'ws'
   },
-  // {
-  //   code: 'system',
-  //   name: '系统设置',
-  //   path: '/admin/system',
-  //   icon: markRaw(Setting)
-  // },
   {
-    code: 'images',
+    path: '/admin/banners',
     name: '图片管理',
-    path: '/admin/images',
-    icon: markRaw(Picture)
+    icon: 'Picture',
+    moduleCode: 'banner'
   }
-])
+]
+
+// 过滤有权限的菜单
+const menus = computed(() => {
+  if (!userStore.permissions) return []
+  
+  return menuConfig.filter(menu => {
+    const module = userStore.permissions.find(
+      m => m.code === menu.moduleCode
+    )
+    return module?.checked
+  })
+})
+
+// 处理菜单点击
+const handleMenuClick = (menu) => {
+  if (!menu || !menu.path) return
+  router.push(menu.path)
+}
 
 // 在组件挂载时初始化权限
 onMounted(() => {
@@ -468,11 +544,15 @@ onMounted(() => {
 .el-dropdown-link {
   display: flex;
   align-items: center;
+  gap: 8px;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .username {
-  margin: 0 8px;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
 }
 
 .el-main {
@@ -530,5 +610,37 @@ onMounted(() => {
   &.is-active {
     background-color: var(--hover-bg) !important;
   }
+}
+
+.user-info {
+  padding: 8px;
+  min-width: 200px;
+}
+
+.info-item {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-item .label {
+  color: var(--el-text-color-secondary);
+  width: 60px;
+}
+
+.role-tag {
+  margin-right: 4px;
+}
+
+.edit-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--el-text-color-regular);
+}
+
+.edit-profile:hover {
+  color: var(--el-color-primary);
 }
 </style> 

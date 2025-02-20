@@ -1,74 +1,88 @@
-import { API } from '../config/api'
 import axios from 'axios'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 
+// 白名单接口列表
+const whiteList = [
+  { method: 'GET', path: '/api/user/captcha' },
+  { method: 'POST', path: '/api/user/login' },
+  { method: 'POST', path: '/api/user/register' },
+  { method: 'GET', path: '/api/user/role' },
+  { method: 'GET', path: '/api/user/oauth/github/login' },
+  { method: 'GET', path: '/api/user/oauth/callback' },
+  { method: 'GET', path: '/api/banner' },
+  { method: 'GET', path: '/api/cart' },
+  { method: 'POST', path: '/api/cart' },
+  { method: 'GET', path: '/api/category' },
+  { method: 'GET', path: '/api/product' },
+  { method: 'GET', path: '/api/role/public' },
+  { method: 'GET', path: '/api/role/permission' },
+  { method: 'POST', path: '/api/order' },
+  { method: 'GET', path: '/api/order' },
+  { method: 'PUT', path: '/api/order' },
+  { method: 'DELETE', path: '/api/order' },
+  { method: 'POST', path: '/api/cart/delete' },
+]
+
+// 创建一个全局的路由实例引用
+let router = null
+
+// 添加设置路由实例的方法
+export const setRouter = (routerInstance) => {
+  router = routerInstance
+}
+
 // 创建 axios 实例
-const service = axios.create({
-  baseURL: 'http://localhost:8888/api',
-  timeout: 5000
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  timeout: 5000,
+  withCredentials: true
 })
 
-// 请求拦截器
-service.interceptors.request.use(
-  config => {
-    const userStore = useUserStore()
-    const userPermissions = userStore.permissions
-
-    // 检查用户是否有权限访问该 API
-    const hasAccess = userPermissions.some(p => 
-      p.method === config.method.toUpperCase() && p.path === config.url
-    )
-
-    if (!hasAccess) {
-      ElMessage.error('无权限访问该接口')
-      return Promise.reject(new Error('无权限访问'))
+// 响应拦截器
+axiosInstance.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response && error.response.status === 401) {
+      const userStore = useUserStore()
+      userStore.logout()
+      window.location.href = '/login'
     }
-
-    return config
-  },
-  error => Promise.reject(error)
+    return Promise.reject(error)
+  }
 )
 
-// 创建请求实例
-const request = async (url, options = {}) => {
-  const defaultOptions = {
-    credentials: 'include', // 允许发送 cookie
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  }
-
-  const finalOptions = {
-    ...defaultOptions,
-    ...options,
-    headers: {
-      ...defaultOptions.headers,
-      ...options.headers
-    }
-  }
-
-  // 如果是 DELETE 请求，直接使用 query 参数
-  if (options.method === 'DELETE') {
-    // 不需要处理 body，因为已经在 URL 中包含了参数
-    delete options.body
-  }
-
+const requestHandler = async (url, options = {}) => {
   try {
-    const response = await fetch(API.BASE_URL + url, finalOptions)
-    // 对于 204 状态码，直接返回成功
-    if (response.status === 204) {
-      return { code: 200, message: '操作成功' }
+    const method = (options.method || 'GET').toUpperCase()
+    const config = {
+      url,
+      method,
+      headers: options.headers || {}
     }
-    const data = await response.json()
-    if (data.code === 200) {
-      return data
-    } else {
-      throw new Error(data.message || '请求失败')
+
+    // 处理请求数据
+    if (options.data) {
+      if (method === 'GET') {
+        // GET 请求转换为查询参数
+        config.params = options.data
+      } else if (options.data instanceof FormData) {
+        // FormData 不设置 Content-Type
+        config.data = options.data
+      } else {
+        // JSON 数据
+        config.headers['Content-Type'] = 'application/json'
+        config.data = options.data
+      }
     }
+
+    console.log('Request config:', config)
+    const response = await axiosInstance(config)
+    return response
   } catch (error) {
+    console.error('Request failed:', error)
     throw error
   }
 }
 
-export default service 
+export default requestHandler

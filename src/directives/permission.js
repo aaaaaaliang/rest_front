@@ -1,11 +1,11 @@
-import { usePermissionStore } from '../stores/permission'
+import { useUserStore } from '../stores/user'
 
-export const vPermission = {
+export const permission = {
   mounted(el, binding) {
-    const permissionStore = usePermissionStore()
-    const { value } = binding
+    const userStore = useUserStore()
+    const { method, path } = binding.value
 
-    if (value && !permissionStore.hasPermission(value)) {
+    if (!userStore.hasPermission(method, path)) {
       el.parentNode?.removeChild(el)
     }
   }

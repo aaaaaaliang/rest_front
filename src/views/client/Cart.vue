@@ -22,7 +22,7 @@
             <template #default="{ row }">
               <div class="product-info">
                 <el-image
-                  :src="getImageUrl(row.picture?.code, IMAGE_SIZE.THUMBNAIL)"
+                  :src="row.picture?.code"
                   fit="cover"
                   class="product-image"
                 >
@@ -39,7 +39,7 @@
 
           <el-table-column label="单价" width="120" align="center">
             <template #default="{ row }">
-              <span class="price">¥{{ row.product_price.toFixed(2) }}</span>
+              <span class="price">¥{{ (row.product_price ?? 0).toFixed(2) }}</span>
             </template>
           </el-table-column>
 
@@ -58,7 +58,7 @@
           <el-table-column label="小计" width="120" align="center">
             <template #default="{ row }">
               <span class="subtotal">
-                ¥{{ (row.product_price * row.select_num).toFixed(2) }}
+                ¥{{ ((row.product_price ?? 0) * (row.select_num ?? 1)).toFixed(2) }}
               </span>
             </template>
           </el-table-column>
@@ -112,34 +112,71 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCartStore } from '../../stores/cart'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Picture } from '@element-plus/icons-vue'
-import { IMAGE_SIZE, getImageUrl } from '../../config/constants'
+import request from '../../utils/request'
+import { API } from '../../config/api'
 
 const router = useRouter()
-const cartStore = useCartStore()
+const items = ref([])
+const loading = ref(false)
 
 // 购物车商品列表
-const cartItems = computed(() => cartStore.items)
+const cartItems = computed(() => items.value || [])
 
 // 计算总数量
 const totalCount = computed(() => {
-  return cartItems.value.reduce((sum, item) => sum + item.select_num, 0)
+  return cartItems.value.reduce((sum, item) => sum + (item.select_num || 0), 0)
 })
 
 // 计算总价
 const totalPrice = computed(() => {
   return cartItems.value.reduce((sum, item) => {
-    return sum + item.product_price * item.select_num
+    return sum + (item.product_price || 0) * (item.select_num || 0)
   }, 0)
 })
 
+// 获取购物车列表
+const fetchCartList = async () => {
+  loading.value = true
+  try {
+    const params = new URLSearchParams({
+      index: 1,
+      size: 100
+    })
+    const res = await request(`${API.CART.LIST}?${params}`)
+    if (res.data && res.data.code === 200) {
+      items.value = res.data.data || []
+    }
+  } catch (error) {
+    ElMessage.error('获取购物车失败')
+    console.error('获取购物车失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
 // 更新商品数量
 const handleQuantityChange = async (item, value) => {
-  await cartStore.updateQuantity(item.product_code, value)
+  try {
+    const res = await request(API.CART.ADD, {
+      method: 'POST',
+      data: {
+        product_code: item.product_code,
+        product_num: value
+      }
+    })
+    
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('更新成功')
+      await fetchCartList()
+    }
+  } catch (error) {
+    ElMessage.error('更新数量失败')
+    console.error('更新数量失败:', error)
+  }
 }
 
 // 删除商品
@@ -150,10 +187,23 @@ const handleRemove = async (item) => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await cartStore.removeFromCart(item.code)
-    ElMessage.success('删除成功')
-  } catch {
-    // 用户取消删除
+    
+    const res = await request(API.CART.DELETE, {
+      method: 'POST',
+      data: {
+        code: [item.code]
+      }
+    })
+    
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('删除成功')
+      await fetchCartList()
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+      console.error('删除失败:', error)
+    }
   }
 }
 
@@ -165,9 +215,23 @@ const handleClearCart = async () => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await cartStore.clearCart()
-  } catch {
-    // 用户取消清空
+    
+    const res = await request(API.CART.DELETE, {
+      method: 'POST',
+      data: {
+        code: cartItems.value.map(item => item.code)
+      }
+    })
+    
+    if (res.data && res.data.code === 200) {
+      items.value = []
+      ElMessage.success('清空购物车成功')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('清空购物车失败')
+      console.error('清空购物车失败:', error)
+    }
   }
 }
 
@@ -178,7 +242,7 @@ const handleCheckout = () => {
 
 // 初始化
 onMounted(() => {
-  cartStore.fetchCartList()
+  fetchCartList()
 })
 </script>
 

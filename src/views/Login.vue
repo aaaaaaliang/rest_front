@@ -50,21 +50,25 @@
               />
             </el-form-item>
 
-            <el-form-item prop="captcha_solution" class="captcha-item">
-              <el-input
-                v-model="loginForm.captcha_solution"
-                placeholder="验证码"
-                :prefix-icon="Key"
-              >
-                <template #append>
-                  <img 
-                    :src="captchaImage"
-                    alt="验证码"
-                    class="captcha-img"
-                    @click="refreshCaptcha"
-                  >
-                </template>
-              </el-input>
+            <el-form-item prop="captcha">
+              <div class="captcha-container">
+                <el-input
+                  v-model="loginForm.captcha"
+                  placeholder="验证码"
+                  style="width: 200px"
+                >
+                  <template #prefix>
+                    <el-icon><Key /></el-icon>
+                  </template>
+                </el-input>
+                <img 
+                  v-if="captchaImg"
+                  :src="captchaImg"
+                  class="captcha-img"
+                  @click="refreshCaptcha"
+                  alt="验证码"
+                />
+              </div>
             </el-form-item>
 
             <el-form-item>
@@ -105,16 +109,6 @@
               />
             </el-form-item>
 
-            <el-form-item prop="confirm_password">
-              <el-input
-                v-model="registerForm.confirm_password"
-                type="password"
-                placeholder="确认密码"
-                :prefix-icon="Lock"
-                show-password
-              />
-            </el-form-item>
-
             <el-form-item prop="email">
               <el-input
                 v-model="registerForm.email"
@@ -123,21 +117,20 @@
               />
             </el-form-item>
 
-            <el-form-item prop="captcha_solution" class="captcha-item">
-              <el-input
-                v-model="registerForm.captcha_solution"
-                placeholder="验证码"
-                :prefix-icon="Key"
-              >
-                <template #append>
-                  <img 
-                    :src="captchaImage"
-                    alt="验证码"
-                    class="captcha-img"
-                    @click="refreshCaptcha"
-                  >
-                </template>
-              </el-input>
+            <el-form-item prop="captcha">
+              <div class="captcha-container">
+                <el-input
+                  v-model="registerForm.captcha"
+                  placeholder="验证码"
+                  :prefix-icon="Key"
+                />
+                <img 
+                  :src="captchaImg"
+                  class="captcha-img"
+                  @click="refreshCaptcha"
+                  alt="验证码"
+                />
+              </div>
             </el-form-item>
 
             <el-form-item>
@@ -176,38 +169,48 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, reactive } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Key, Message } from '@element-plus/icons-vue'
 import request from '../utils/request'
 import { API } from '../config/api'
 import { useUserStore } from '../stores/user'
+import { usePermissionStore } from '../stores/permission'
 
+// 路由实例
 const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
+const permissionStore = usePermissionStore()
+
+// 页面状态
 const isLogin = ref(true)
 const loading = ref(false)
-const captchaImage = ref('')
-const captchaId = ref('')
 
-// 登录表单
+// 验证码相关
+const captchaImg = ref('')
+const captchaId = ref('')
+const captchaImage = ref('')
+
+// 表单引用
 const loginFormRef = ref()
-const loginForm = ref({
+const registerFormRef = ref()
+
+// 表单数据
+const loginForm = reactive({
   username: '',
   password: '',
-  captcha_id: '',
-  captcha_solution: ''
+  captcha: '',
+  captcha_id: ''
 })
 
-// 注册表单
-const registerFormRef = ref()
 const registerForm = ref({
   username: '',
   password: '',
-  confirm_password: '',
   email: '',
   captcha_id: '',
-  captcha_solution: ''
+  captcha: ''
 })
 
 // 表单验证规则
@@ -218,7 +221,7 @@ const loginRules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }
   ],
-  captcha_solution: [
+  captcha: [
     { required: true, message: '请输入验证码', trigger: 'blur' }
   ]
 }
@@ -232,128 +235,150 @@ const registerRules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能小于 6 个字符', trigger: 'blur' }
   ],
-  confirm_password: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    {
-      validator: (rule, value, callback) => {
-        if (value !== registerForm.value.password) {
-          callback(new Error('两次输入密码不一致'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ],
   email: [
     { required: true, message: '请输入邮箱地址', trigger: 'blur' },
     { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
   ],
-  captcha_solution: [
+  captcha: [
     { required: true, message: '请输入验证码', trigger: 'blur' }
   ]
 }
 
-// 获取验证码
-const getCaptcha = async () => {
+// API 请求方法
+const fetchCaptcha = async () => {
   try {
-    const data = await request(API.USER.CAPTCHA)
-    captchaImage.value = data.data.captcha
-    captchaId.value = data.data.id
-    loginForm.value.captcha_id = data.data.id
-    registerForm.value.captcha_id = data.data.id
+    const res = await request('/api/user/captcha')
+    if (res.data && res.data.code === 200) {
+      const captchaData = res.data.data
+      captchaImg.value = captchaData.captcha
+      captchaImage.value = captchaData.captcha
+      captchaId.value = captchaData.id
+      loginForm.captcha_id = captchaData.id
+      registerForm.value.captcha_id = captchaData.id
+    }
   } catch (error) {
     console.error('获取验证码失败:', error)
   }
 }
 
-// 刷新验证码
+// 事件处理方法
 const refreshCaptcha = () => {
-  getCaptcha()
+  fetchCaptcha()
 }
 
-// 登录处理
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
-  await loginFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        // 1. 登录
-        await request(API.USER.LOGIN, {
-          method: 'POST',
-          body: JSON.stringify(loginForm.value)
-        })
-
-        // 2. 获取用户角色信息
-        const roleRes = await request(API.USER.GET_ROLE)
-        
-        // 3. 存储用户信息
-        const userStore = useUserStore()
-        userStore.setUserInfo({
-          username: loginForm.value.username,
-          user_code: roleRes.data.user_code,
-          roles: roleRes.data.roles
-        })
-
-        ElMessage.success('登录成功')
-        // 确保跳转执行
-        await router.push('/admin')
-      } catch (error) {
-        ElMessage.error(error.message || '登录失败')
-        refreshCaptcha()
-      } finally {
-        loading.value = false
-      }
+  try {
+    await loginFormRef.value.validate()
+    loading.value = true
+    
+    // 构造登录数据
+    const loginData = {
+      username: loginForm.username,
+      password: loginForm.password,
+      captcha: loginForm.captcha,
+      captcha_id: captchaId.value
     }
-  })
+
+    try {
+      const res = await request(API.USER.LOGIN, {
+        method: 'POST',
+        data: loginData
+      })
+      
+      if (res.data && res.data.code === 200) {
+        // 登录成功后，获取用户角色和权限
+        await userStore.fetchUserRole()
+        ElMessage.success('登录成功')
+        // 获取重定向地址或默认跳转到首页
+        const redirect = route.query.redirect || '/admin'
+        router.push(redirect)
+      } else {
+        // 显示错误信息
+        ElMessage.error(res.data?.message || '登录失败')
+        refreshCaptcha()
+      }
+    } catch (error) {
+      // 显示具体的错误信息
+      ElMessage.error(error.response?.data?.message || error.message || '登录失败')
+      refreshCaptcha()
+    }
+  } catch (error) {
+    // 表单验证失败
+    console.error('表单验证失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
-// 注册处理
 const handleRegister = async () => {
   if (!registerFormRef.value) return
   
-  await registerFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        await request(API.USER.REGISTER, {
-          method: 'POST',
-          body: JSON.stringify({
-            username: registerForm.value.username,
-            password: registerForm.value.password,
-            email: registerForm.value.email,
-            captcha_id: registerForm.value.captcha_id,
-            captcha_solution: registerForm.value.captcha_solution
-          })
-        })
-        ElMessage.success('注册成功')
-        isLogin.value = true
-        refreshCaptcha()
-      } catch (error) {
-        ElMessage.error(error.message)
-        refreshCaptcha()
-      } finally {
-        loading.value = false
+  try {
+    await registerFormRef.value.validate()
+    loading.value = true
+    
+    const registerData = {
+      username: registerForm.value.username,
+      password: registerForm.value.password,
+      email: registerForm.value.email,
+      captcha_id: captchaId.value,
+      captcha: registerForm.value.captcha
+    }
+
+    const res = await request(API.USER.CREATE, {
+      method: 'POST',
+      data: registerData
+    })
+
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('注册成功')
+      isLogin.value = true
+      registerForm.value = {
+        username: '',
+        password: '',
+        email: '',
+        captcha_id: '',
+        captcha: ''
       }
     }
-  })
+  } catch (error) {
+    ElMessage.error(error.message || '注册失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-// GitHub 登录
 const handleGithubLogin = () => {
   window.location.href = API.BASE_URL + API.USER.GITHUB_LOGIN
 }
 
-// 切换登录/注册表单
-const toggleForm = () => {
-  isLogin.value = !isLogin.value
-  refreshCaptcha()
+// GitHub 登录回调处理
+const handleGithubCallback = async () => {
+  if (route.query.code) {
+    loading.value = true
+    try {
+      const res = await request(API.USER.GITHUB_CALLBACK + `?code=${route.query.code}`, {
+        method: 'GET'
+      })
+      
+      if (res.data && res.data.code === 200) {
+        ElMessage.success('GitHub 登录成功')
+        // 后端会处理重定向，这里不需要额外的跳转逻辑
+      }
+    } catch (error) {
+      ElMessage.error(error.message || 'GitHub 登录失败')
+      router.push('/login')
+    } finally {
+      loading.value = false
+    }
+  }
 }
 
-onMounted(() => {
-  getCaptcha()
+// 生命周期钩子
+onMounted(()=>{
+  fetchCaptcha()
 })
 </script>
 
@@ -614,7 +639,5 @@ onMounted(() => {
     border-radius: 0;
   }
 }
-
-
 
 </style>

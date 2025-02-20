@@ -7,7 +7,8 @@
         :class="{ active: !currentCategory }"
         @click="handleCategoryClick('')"
       >
-        全部菜品
+        <el-icon><Menu /></el-icon>
+        <span>全部菜品</span>
       </div>
       <div
         v-for="category in categoryStore.categories"
@@ -16,7 +17,8 @@
         :class="{ active: currentCategory === category.code }"
         @click="handleCategoryClick(category.code)"
       >
-        {{ category.CategoryName }}
+        <el-icon><ForkSpoon /></el-icon>
+        <span>{{ category.CategoryName }}</span>
         <template v-if="category.sub_categories?.length">
           <div
             v-for="sub in category.sub_categories"
@@ -57,7 +59,7 @@
             <h3 class="dish-name">{{ dish.products_name }}</h3>
             <p class="dish-desc">{{ dish.describe || '暂无描述' }}</p>
             <div class="dish-footer">
-              <span class="price">¥{{ dish.price.toFixed(2) }}</span>
+              <span class="price">¥{{ (dish.price ?? 0).toFixed(2) }}</span>
               <div class="actions">
                 <el-button
                   type="primary"
@@ -113,7 +115,7 @@
               </el-image>
               <div class="item-info">
                 <h4>{{ item.product_name }}</h4>
-                <div class="item-price">¥{{ item.product_price.toFixed(2) }}</div>
+                <div class="item-price">¥{{ (item.product_price ?? 0).toFixed(2) }}</div>
                 <div class="item-actions">
                   <el-input-number
                     v-model="item.select_num"
@@ -175,13 +177,13 @@
           <el-table-column prop="name" label="菜品" />
           <el-table-column prop="price" label="单价">
             <template #default="scope">
-              ¥{{ scope.row.price.toFixed(2) }}
+              ¥{{ (scope.row.price ?? 0).toFixed(2) }}
             </template>
           </el-table-column>
           <el-table-column prop="quantity" label="数量" width="100" />
           <el-table-column label="小计">
             <template #default="scope">
-              ¥{{ (scope.row.price * scope.row.quantity).toFixed(2) }}
+              ¥{{ ((scope.row.price ?? 0) * (scope.row.quantity ?? 1)).toFixed(2) }}
             </template>
           </el-table-column>
         </el-table>
@@ -209,7 +211,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../../stores/cart'
 import { ElMessage } from 'element-plus'
-import { Picture } from '@element-plus/icons-vue'
+import { Picture, Menu, ForkSpoon } from '@element-plus/icons-vue'
 import { useCategoryStore } from '../../stores/category'
 import request from '../../utils/request'
 import { API } from '../../config/api'
@@ -242,8 +244,10 @@ const fetchDishes = async () => {
     }
 
     const res = await request(`${API.PRODUCT.LIST}?${params}`)
-    dishes.value = res.data || []
-    total.value = res.total || 0
+    if (res.data && res.data.code === 200) {
+      dishes.value = res.data.data || []
+      total.value = res.data.total || 0
+    }
   } catch (error) {
     ElMessage.error('获取菜品列表失败')
   }
@@ -258,9 +262,28 @@ const handleCategoryClick = (code) => {
 }
 
 // 处理加入购物车
-const handleAddToCart = async (dish) => {
-  await cartStore.addToCart(dish)
-  ElMessage.success('加入购物车成功')
+const handleAddToCart = async (product) => {
+  try {
+    const res = await request(API.CART.ADD, {
+      method: 'POST',
+      data: {
+        product_code: product.code,  // 商品编号
+        product_num: 1  // 商品数量
+      }
+    })
+
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('已添加到购物车')
+      cartStore.updateCartCount()
+    }
+  } catch (error) {
+    if (error.response?.status === 401) {
+      ElMessage.warning('请先登录')
+      router.push('/login')
+    } else {
+      ElMessage.error(error.message || '添加失败')
+    }
+  }
 }
 
 // 处理分页
@@ -297,7 +320,7 @@ const rules = {
 const cartItems = computed(() => cartStore.items)
 const totalPrice = computed(() => {
   return cartItems.value.reduce((sum, item) => {
-    return sum + item.product_price * item.select_num
+    return sum + (item.product_price ?? 0) * (item.select_num ?? 1)
   }, 0)
 })
 
@@ -329,9 +352,14 @@ const handleSubmitOrder = async () => {
 
 // 初始化
 onMounted(async () => {
-  categoryStore.fetchCategories()
-  fetchDishes()
-  await cartStore.fetchCartList()
+  try {
+    await categoryStore.fetchCategories()
+    await fetchDishes()
+    await cartStore.fetchCartList()
+  } catch (error) {
+    console.error('初始化失败:', error)
+    ElMessage.error('加载数据失败')
+  }
 })
 </script>
 
@@ -345,31 +373,87 @@ onMounted(async () => {
 }
 
 .category-nav {
-  width: 200px;
+  width: 220px;
   background: #fff;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 16px 0;
   height: fit-content;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 20px;
 
   .category-item {
-    padding: 12px 20px;
+    padding: 16px 24px;
     cursor: pointer;
     transition: all 0.3s;
     font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
 
-    &:hover, &.active {
+    .el-icon {
+      font-size: 18px;
+      color: var(--el-text-color-secondary);
+      transition: all 0.3s;
+    }
+
+    &:hover {
       color: var(--el-color-primary);
       background: var(--el-color-primary-light-9);
+
+      .el-icon {
+        color: var(--el-color-primary);
+      }
+    }
+
+    &.active {
+      color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
+      font-weight: 500;
+
+      .el-icon {
+        color: var(--el-color-primary);
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 24px;
+        background: var(--el-color-primary);
+        border-radius: 0 4px 4px 0;
+      }
     }
 
     .sub-category {
-      padding: 8px 0 8px 20px;
-      margin-top: 8px;
+      padding: 12px 0 12px 30px;
+      margin-top: 4px;
       font-size: 14px;
       color: var(--el-text-color-regular);
+      display: flex;
+      align-items: center;
 
-      &:hover, &.active {
+      &::before {
+        content: '';
+        width: 4px;
+        height: 4px;
+        background: currentColor;
+        border-radius: 50%;
+        margin-right: 8px;
+        opacity: 0.5;
+      }
+
+      &:hover {
         color: var(--el-color-primary);
+      }
+
+      &.active {
+        color: var(--el-color-primary);
+        font-weight: 500;
       }
     }
   }

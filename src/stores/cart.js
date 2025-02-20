@@ -7,6 +7,7 @@ import { ElMessage } from 'element-plus'
 export const useCartStore = defineStore('cart', () => {
   const items = ref([])
   const total = ref(0)
+  const count = ref(0)  // 添加购物车数量
 
   // 计算总价
   const totalPrice = computed(() => {
@@ -15,18 +16,47 @@ export const useCartStore = defineStore('cart', () => {
     }, 0)
   })
 
+  // 添加 totalCount 计算属性
+  const totalCount = computed(() => {
+    return items.value.reduce((sum, item) => sum + (item.select_num || 0), 0)
+  })
+
   // 获取购物车列表
   const fetchCartList = async () => {
     try {
+      // 添加分页参数
+      const params = new URLSearchParams({
+        index: 1,  // 默认第一页
+        size: 100  // 设置一个较大的数值，确保能获取所有购物车商品
+      })
+
+      const res = await request(`${API.CART.LIST}?${params}`)
+      if (res.data && res.data.code === 200) {
+        items.value = res.data.data || []
+        total.value = res.data.total || 0
+        count.value = items.value.length  // 更新数量
+      }
+    } catch (error) {
+      console.error('获取购物车失败:', error)
+      ElMessage.error('获取购物车失败')
+    }
+  }
+
+  // 更新购物车数量
+  const updateCartCount = async () => {
+    try {
+      // 同样添加分页参数
       const params = new URLSearchParams({
         index: 1,
         size: 100
       })
+
       const res = await request(`${API.CART.LIST}?${params}`)
-      items.value = res.data || []
-      total.value = res.total || 0
+      if (res.data && res.data.code === 200) {
+        count.value = (res.data.data || []).length
+      }
     } catch (error) {
-      ElMessage.error('获取购物车失败')
+      console.error('更新购物车数量失败:', error)
     }
   }
 
@@ -35,11 +65,15 @@ export const useCartStore = defineStore('cart', () => {
     try {
       await request(API.CART.ADD, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           product_code: product.code,
           product_num: 1
         })
       })
+      
       await fetchCartList()
     } catch (error) {
       ElMessage.error('添加到购物车失败')
@@ -47,59 +81,63 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   // 更新商品数量
-  const updateQuantity = async (code, num) => {
+  const updateQuantity = async (productCode, quantity) => {
     try {
-      await request(API.CART.ADD, {
-        method: 'POST',
-        body: JSON.stringify({
-          product_code: code,
-          product_num: num  // 直接传递输入框的值
-        })
+      const res = await request(API.CART.UPDATE, {
+        method: 'PUT',
+        data: {
+          product_code: productCode,  // 商品编号
+          product_num: quantity  // 更新的数量
+        }
       })
-      await fetchCartList()
+      
+      if (res.data && res.data.code === 200) {
+        await fetchCartList()  // 重新获取购物车列表
+      }
     } catch (error) {
+      console.error('更新数量失败:', error)
       ElMessage.error('更新数量失败')
     }
   }
 
-  // 从购物车移除（支持单个或批量删除）
-  const removeFromCart = async (codes) => {
+  // 从购物车移除
+  const removeFromCart = async (code) => {
     try {
-      await request(API.CART.DELETE, {
+      const res = await request(API.CART.DELETE, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          code: Array.isArray(codes) ? codes : [codes]
-        })
+        data: {
+          code: [code]  // 修改这里，传递商品的 code
+        }
       })
-      await fetchCartList()
+      
+      if (res.data && res.data.code === 200) {
+        await fetchCartList()
+        ElMessage.success('移除成功')
+      }
     } catch (error) {
-      console.error('Delete error:', error)
-      ElMessage.error('移除商品失败')
+      console.error('移除失败:', error)
+      ElMessage.error('移除失败')
     }
   }
 
   // 清空购物车
   const clearCart = async () => {
     try {
-      const codes = items.value.map(item => item.code)
-      if (codes.length > 0) {
-        await request(API.CART.DELETE, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            code: codes
-          })
-        })
-        ElMessage.success('购物车已清空')
-        await fetchCartList()
+      const res = await request(API.CART.DELETE, {
+        method: 'POST',
+        data: {
+          code: items.value.map(item => item.code)  // 传递所有商品的 code
+        }
+      })
+      
+      if (res.data && res.data.code === 200) {
+        items.value = []
+        total.value = 0
+        count.value = 0
+        ElMessage.success('清空购物车成功')
       }
     } catch (error) {
-      console.error('Clear cart error:', error)
+      console.error('清空购物车失败:', error)
       ElMessage.error('清空购物车失败')
     }
   }
@@ -108,7 +146,10 @@ export const useCartStore = defineStore('cart', () => {
     items,
     total,
     totalPrice,
+    count,
+    totalCount,  // 导出 totalCount
     fetchCartList,
+    updateCartCount,
     addToCart,
     updateQuantity,
     removeFromCart,

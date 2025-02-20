@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-service">
+  <div v-if="userStore.isLoggedIn" class="customer-service">
     <!-- 悬浮按钮 -->
     <div class="service-button" @click="openChat">
       <el-badge :value="unreadCount" :hidden="unreadCount === 0">
@@ -11,18 +11,27 @@
 
     <!-- 客服抽屉 -->
     <el-drawer
-        v-model="showDrawer"
-        title="在线客服"
-        direction="rtl"
-        size="350px"
+      v-model="showDrawer"
+      title="在线客服"
+      direction="rtl"
+      size="350px"
     >
+      <template #header>
+        <div class="drawer-header">
+          <span>在线客服</span>
+          <el-tag :type="isConnected ? 'success' : 'danger'" size="small">
+            {{ isConnected ? '已连接' : '未连接' }}
+          </el-tag>
+        </div>
+      </template>
+
       <div class="service-container">
         <!-- 消息列表 -->
         <div class="message-list" ref="messageList">
           <div
-              v-for="(message, index) in messages"
-              :key="index"
-              :class="['message', message.fromUser === userCode ? 'user' : 'service']"
+            v-for="(message, index) in messages"
+            :key="index"
+            :class="['message', message.fromUser === userStore.user?.code ? 'user' : 'service']"
           >
             <div class="message-content">{{ message.content }}</div>
             <div class="message-time">{{ formatTime(message.timestamp) }}</div>
@@ -32,16 +41,17 @@
         <!-- 输入框 -->
         <div class="input-area">
           <el-input
-              v-model="inputMessage"
-              type="textarea"
-              :rows="3"
-              placeholder="请输入您的问题..."
-              @keyup.enter="handleSend"
+            v-model="inputMessage"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入您的问题..."
+            @keyup.enter.prevent="handleSend"
           />
           <el-button
-              type="primary"
-              @click="handleSend"
-              style="margin-top: 10px; width: 100%"
+            type="primary"
+            @click="handleSend"
+            :disabled="!isConnected"
+            style="margin-top: 10px; width: 100%"
           >
             发送
           </el-button>
@@ -52,112 +62,166 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { Service } from '@element-plus/icons-vue'
-import { API } from '@/config/api'
+import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const showDrawer = ref(false)
 const inputMessage = ref('')
 const messages = ref([])
 const unreadCount = ref(0)
 const messageList = ref(null)
-const userCode = ref('') // 当前用户
 const socket = ref(null)
+const isConnected = ref(false)
+const userStore = useUserStore()
+const maxRetries = 3  // 最大重试次数
+const retryCount = ref(0)  // 当前重试次数
 
-// **格式化时间**
+// 格式化时间
 const formatTime = (timestamp) => {
   if (!timestamp) return ''
   const date = new Date(timestamp)
   return date.toLocaleTimeString()
 }
 
-// **打开聊天窗口**
+// 打开聊天窗口
 const openChat = () => {
   showDrawer.value = true
   unreadCount.value = 0
+  if (!isConnected.value && retryCount.value < maxRetries) {
+    connectWebSocket()
+  }
 }
 
-// **初始化 WebSocket**
-const connectWebSocket = () => {
-  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
-    console.log('WebSocket 已连接')
+// 连接 WebSocket
+const connectWebSocket = async () => {
+  if (retryCount.value >= maxRetries) {
+    ElMessage.error('连接失败，请稍后重试')
     return
   }
 
-  const wsUrl = `${API.WS.GET}?token=${document.cookie}`
-  socket.value = new WebSocket(wsUrl)
+  try {
+    const wsUrl = `http://localhost:8888/api/ws`
+    console.log('正在连接WebSocket:', wsUrl)
+    
+    socket.value = new WebSocket(wsUrl)
 
-  socket.value.onopen = () => {
-    console.log('WebSocket 连接成功')
-  }
-
-  socket.value.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data)
-      if (msg.type === 'chat') {
-        handleIncomingMessage(msg)
+    socket.value.onopen = () => {
+      console.log('WebSocket 连接成功')
+      isConnected.value = true
+      retryCount.value = 0  // 重置重试次数
+      
+      // 发送身份验证消息
+      const identifyMsg = {
+        type: 'identify',
+        role: 'user',
+        user_code: userStore.user?.code
       }
-    } catch (error) {
-      console.error('WebSocket 消息解析失败:', error)
+      socket.value.send(JSON.stringify(identifyMsg))
     }
-  }
 
-  socket.value.onerror = (error) => {
-    console.error('WebSocket 发生错误:', error)
-  }
+    socket.value.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+        if (msg.error) {
+          ElMessage.error(msg.error)
+          return
+        }
+        
+        const newMessage = {
+          content: msg.content,
+          timestamp: msg.timestamp || Date.now(),
+          fromUser: msg.from_user,
+          type: msg.from_user === userStore.user?.code ? 'user' : 'service'
+        }
+        
+        messages.value.push(newMessage)
+        if (!showDrawer.value) {
+          unreadCount.value++
+        }
+        
+        scrollToBottom()
+      } catch (error) {
+        console.error('解析消息失败:', error)
+      }
+    }
 
-  socket.value.onclose = () => {
-    console.log('WebSocket 断开，尝试重连...')
-    setTimeout(connectWebSocket, 3000) // 3 秒后重连
+    socket.value.onclose = (event) => {
+      console.log('WebSocket 连接关闭:', event)
+      isConnected.value = false
+      
+      // 如果不是主动关闭且未达到最大重试次数，则尝试重连
+      if (!event.wasClean && retryCount.value < maxRetries) {
+        retryCount.value++
+        console.log(`尝试第 ${retryCount.value} 次重连...`)
+        setTimeout(() => {
+          if (!isConnected.value) {
+            connectWebSocket()
+          }
+        }, 3000)
+      }
+    }
+
+    socket.value.onerror = (error) => {
+      console.error('WebSocket 错误:', error)
+      isConnected.value = false
+    }
+  } catch (error) {
+    console.error('创建 WebSocket 连接失败:', error)
+    ElMessage.error('创建连接失败')
   }
 }
 
-// **处理收到的消息**
-const handleIncomingMessage = (msg) => {
-  messages.value.push(msg)
-  if (!showDrawer.value) {
-    unreadCount.value += 1
-  }
-  nextTick(() => {
-    messageList.value.scrollTop = messageList.value.scrollHeight
-  })
-}
-
-// **发送消息**
+// 发送消息
 const handleSend = () => {
-  if (!inputMessage.value.trim()) return
-
-  // ✅ 解决 WebSocket 连接未就绪的问题
-  if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
-    console.error('WebSocket 未连接，无法发送消息')
-    return
-  }
+  if (!inputMessage.value.trim() || !isConnected.value) return
 
   const message = {
-    fromUser: userCode.value,
-    toUser: '客服',
-    content: inputMessage.value,
-    timestamp: new Date().toISOString(),
-    type: 'chat'
+    type: 'chat',
+    content: inputMessage.value.trim(),
+    from_user: userStore.user?.code,
+    to_user: 'service',
+    timestamp: Date.now()
   }
 
   try {
     socket.value.send(JSON.stringify(message))
-    messages.value.push(message)
+    inputMessage.value = ''
+    scrollToBottom()
   } catch (error) {
-    console.error('WebSocket 发送消息失败:', error)
+    ElMessage.error('发送失败')
   }
+}
 
-  inputMessage.value = ''
-
+// 滚动到底部
+const scrollToBottom = () => {
   nextTick(() => {
-    messageList.value.scrollTop = messageList.value.scrollHeight
+    if (messageList.value) {
+      messageList.value.scrollTop = messageList.value.scrollHeight
+    }
   })
 }
 
-// **监听 WebSocket**
+// 监听抽屉状态
+watch(showDrawer, (newVal) => {
+  if (newVal) {
+    unreadCount.value = 0
+    scrollToBottom()
+  }
+})
+
 onMounted(() => {
-  connectWebSocket()
+  if (userStore.isLoggedIn && userStore.token) {
+    connectWebSocket()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (socket.value) {
+    socket.value.close(1000, '用户关闭')  // 使用正常关闭代码
+  }
+  retryCount.value = maxRetries  // 防止继续重试
 })
 </script>
 
@@ -167,6 +231,13 @@ onMounted(() => {
   right: 20px;
   bottom: 20px;
   z-index: 999;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 20px;
 }
 
 .service-container {

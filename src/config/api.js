@@ -8,14 +8,18 @@ export const API = {
     REGISTER: '/api/user',
     CAPTCHA: '/api/user/captcha',
     GITHUB_LOGIN: '/api/user/oauth/github/login',
-    LIST: '/api/user/list',           // 获取用户列表
-    CREATE: '/api/user/add',             // 新增用户(默认密码)
-    UPDATE: '/api/user',              // 更新用户
-    DELETE: '/api/user',              // 删除用户
-    GET_ROLES: '/api/user/roles',     // 获取用户角色
-    ASSIGN_ROLES: '/api/user/assign', // 分配角色
-    RESET_PASSWORD: '/api/user/reset', // 重置用户密码
-    GET_ROLE: '/api/user/role',  // 添加获取用户角色的接口
+    GITHUB_CALLBACK: '/api/user/oauth/callback',
+    LIST: '/api/user/list',
+    CREATE: '/api/user',
+    UPDATE: '/api/user',
+    DELETE: '/api/user',
+    GET_ROLES: '/api/user/roles',
+    ASSIGN_ROLES: '/api/user/assign',
+    RESET_PASSWORD: '/api/user/reset',
+    GET_ROLE: '/api/user/role',
+    ROLES: '/api/user/roles',
+    ADDUSER:"api/user/add",
+    LOGOUT: '/api/user/logout'
   },
 
   CATEGORY: {
@@ -43,34 +47,33 @@ export const API = {
   },
 
   ORDER: {
-    LIST: '/api/order',    // GET    获取订单列表
-    CREATE: '/api/order',  // POST   创建订单
-    UPDATE: '/api/order',  // PUT    更新订单
-    DELETE: '/api/order'   // DELETE 删除订单
+    ADD: '/api/order',
+    LIST: '/api/order',
+    DELETE: '/api/order',
+    UPDATE: '/api/order'
   },
 
   BANNER: {
-    LIST: '/api/banner',    // GET    获取轮播图列表
-    CREATE: '/api/banner',  // POST   创建轮播图
-    UPDATE: '/api/banner',  // PUT    更新轮播图
-    DELETE: '/api/banner'   // DELETE 删除轮播图
+    LIST: '/api/banner',      // GET    获取轮播图列表
+    CREATE: '/api/banner',    // POST   创建轮播图
+    UPDATE: '/api/banner',    // PUT    更新轮播图
+    DELETE: '/api/banner'     // DELETE 删除轮播图
   },
-
 
   ROLE: {
-    LIST: '/api/role',  // 获取角色列表
-    CREATE: '/api/role',  // 创建角色
-    UPDATE: '/api/role',  // 更新角色
-    DELETE: '/api/role',  // 删除角色
-    GET_PERMISSIONS: '/api/role/permission',  // 获取某个角色权限
-    LIST_PERMISSIONS: '/api/role/permissions',  // 获取所有权限
-    ASSIGN_PERMISSIONS: '/api/role/assign'  // 分配权限
+    LIST: '/api/role',
+    CREATE: '/api/role',
+    UPDATE: '/api/role',
+    DELETE: '/api/role',
+    GET_PERMISSIONS: '/api/role/permission',
+    ASSIGN_PERMISSIONS: '/api/role/assign'
   },
 
-  SALARY:{
-    CREATE: '/api/salary',  // 分配工资
-    DELETE: '/api/salary', // 根据code删除记录
-    LIST:"/api/salary"   // 展示所有记录
+  SALARY: {
+    CREATE: '/api/salary',
+    DELETE: '/api/salary',
+    LIST: '/api/salary',
+    UPDATE: '/api/salary'
   },
 
   DASHBOARD:{
@@ -78,5 +81,13 @@ export const API = {
   },
   WS:{
     GET:"/api/ws"
+  },
+  PERMISSION: {
+    LIST: '/api/role/permissions'
+  },
+  IMAGE: {
+    LIST: '/api/images',
+    UPLOAD: '/api/image/upload',
+    DELETE: '/api/image'
   }
 } 

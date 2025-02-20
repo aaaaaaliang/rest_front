@@ -2,86 +2,92 @@
   <div class="checkout-page">
     <el-card class="checkout-content">
       <template #header>
-        <div class="page-header">
-          <h3><el-icon><ShoppingCart /></el-icon> 订单确认</h3>
+        <div class="checkout-header">
+          <h3>确认订单</h3>
         </div>
       </template>
 
-      <!-- 商品列表 -->
-      <div class="products-list">
-        <h4><el-icon><Goods /></el-icon> 商品清单</h4>
-        <div class="product-items">
-          <div v-for="item in cartItems" :key="item.code" class="product-item">
-            <el-image
-              :src="getImageUrl(item.picture?.code, IMAGE_SIZE.THUMBNAIL)"
-              fit="cover"
-              class="product-image"
-            >
-              <template #error>
-                <div class="image-placeholder">
-                  <el-icon><Picture /></el-icon>
-                </div>
-              </template>
-            </el-image>
+      <!-- 订单商品列表 -->
+      <el-table :data="cartItems" style="width: 100%">
+        <el-table-column label="商品" min-width="400">
+          <template #default="{ row }">
             <div class="product-info">
-              <div class="product-name">{{ item.product_name }}</div>
-              <div class="product-meta">
-                <span class="price">¥{{ item.product_price.toFixed(2) }}</span>
-                <span class="quantity"><el-icon><Histogram /></el-icon> {{ item.select_num }}</span>
-              </div>
+              <el-image
+                :src="getImageUrl(row.picture?.code, IMAGE_SIZE.THUMBNAIL)"
+                fit="cover"
+                class="product-image"
+              >
+                <template #error>
+                  <div class="image-placeholder">
+                    <el-icon><Picture /></el-icon>
+                  </div>
+                </template>
+              </el-image>
+              <span class="product-name">{{ row.product_name }}</span>
             </div>
-            <div class="product-total">
-              ¥{{ (item.product_price * item.select_num).toFixed(2) }}
-            </div>
-          </div>
-        </div>
-      </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="单价" width="120" align="center">
+          <template #default="{ row }">
+            <span class="price">¥{{ (row.product_price ?? 0).toFixed(2) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="数量" width="120" align="center">
+          <template #default="{ row }">
+            <span>{{ row.select_num }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="小计" width="120" align="center">
+          <template #default="{ row }">
+            <span class="subtotal">
+              ¥{{ ((row.product_price ?? 0) * (row.select_num ?? 1)).toFixed(2) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
 
       <!-- 订单信息 -->
       <div class="order-info">
-        <h4><el-icon><Memo /></el-icon> 订单备注</h4>
-        <el-form
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          label-width="0"
-          class="order-form"
+        <el-form 
+          ref="orderFormRef"
+          :model="orderForm"
+          :rules="orderRules"
+          label-width="100px"
         >
-          <el-form-item prop="remark">
+          <el-form-item label="备注" prop="remark">
             <el-input
-              v-model="form.remark"
+              v-model="orderForm.remark"
               type="textarea"
-              :rows="2"
               placeholder="请输入备注信息（选填）"
-              maxlength="200"
-              show-word-limit
+              :rows="3"
             />
           </el-form-item>
         </el-form>
       </div>
 
-      <!-- 订单金额 -->
-      <div class="order-amount">
-        <div class="amount-item">
-          <el-icon><Money /></el-icon>
-          <span>商品总额</span>
-          <span class="price">¥{{ totalPrice.toFixed(2) }}</span>
+      <!-- 订单底部 -->
+      <div class="order-footer">
+        <div class="footer-left">
+          <span class="total-count">
+            共 {{ totalCount }} 件商品
+          </span>
         </div>
-      </div>
-
-      <!-- 提交订单 -->
-      <div class="submit-order">
-        <div class="total">
-          <span>实付款</span>
-          <span class="price">¥{{ totalPrice.toFixed(2) }}</span>
+        <div class="footer-right">
+          <div class="total-price">
+            合计：<span class="price">¥{{ totalPrice.toFixed(2) }}</span>
+          </div>
+          <el-button 
+            type="primary" 
+            size="large"
+            :loading="submitting"
+            @click="handleSubmitOrder"
+          >
+            提交订单
+          </el-button>
         </div>
-        <el-button 
-          type="primary" 
-          :loading="submitting"
-          @click="handleSubmit"
-        >
-          <el-icon><Check /></el-icon> 提交订单
-        </el-button>
       </div>
     </el-card>
   </div>
@@ -91,235 +97,177 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../../stores/cart'
-import { useOrderStore } from '../../stores/order'
 import { ElMessage } from 'element-plus'
-import { 
-  Picture, 
-  ShoppingCart, 
-  Goods, 
-  Memo, 
-  Money, 
-  Check,
-  Histogram 
-} from '@element-plus/icons-vue'
+import { Picture } from '@element-plus/icons-vue'
 import { IMAGE_SIZE, getImageUrl } from '../../config/constants'
+import request from '../../utils/request'
+import { API } from '../../config/api'
 
 const router = useRouter()
 const cartStore = useCartStore()
-const orderStore = useOrderStore()
-const formRef = ref(null)
+const orderFormRef = ref()
 const submitting = ref(false)
 
-// 购物车商品
-const cartItems = computed(() => cartStore.items)
-
-// 总价
-const totalPrice = computed(() => {
-  return cartItems.value.reduce((sum, item) => {
-    return sum + item.product_price * item.select_num
-  }, 0)
-})
-
-// 表单数据
-const form = ref({
+// 订单表单
+const orderForm = ref({
   remark: ''
 })
 
-// 表单校验规则
-const rules = {
-  remark: [{ max: 200, message: '备注不能超过200个字符', trigger: 'blur' }]
+// 表单验证规则
+const orderRules = {
+  // 移除 phone 相关验证
+}
+
+// 购物车商品列表
+const cartItems = computed(() => {
+  return cartStore.items || []
+})
+
+// 计算总数量
+const totalCount = computed(() => {
+  return cartItems.value.reduce((sum, item) => sum + (item.select_num || 0), 0)
+})
+
+// 计算总价
+const totalPrice = computed(() => {
+  return cartItems.value.reduce((sum, item) => {
+    return sum + (item.product_price || 0) * (item.select_num || 0)
+  }, 0)
+})
+
+// 格式化订单详情
+const formatOrderDetails = (items) => {
+  return items.map(item => ({
+    product_code: item.product_code,
+    product_name: item.product_name,
+    quantity: item.select_num,
+    price: item.product_price,
+    picture: item.picture?.code || ''
+  }))
 }
 
 // 提交订单
-const handleSubmit = async () => {
+const handleSubmitOrder = async () => {
+  if (!orderFormRef.value) return
   if (!cartItems.value.length) {
-    ElMessage.warning('购物车是空的')
+    ElMessage.warning('购物车为空，无法提交订单')
     return
   }
+  
+  await orderFormRef.value.validate(async (valid) => {
+    if (valid) {
+      submitting.value = true
+      try {
+        const orderData = {
+          total_price: totalPrice.value,
+          details: formatOrderDetails(cartItems.value),
+          remark: orderForm.value.remark || ''
+        }
 
-  if (!formRef.value) return
+        const res = await request(API.ORDER.ADD, {
+          method: 'POST',
+          data: orderData
+        })
 
-  try {
-    submitting.value = true
-    const success = await orderStore.createOrderFromCart(cartItems.value, form.value.remark)
-    if (success) {
-      // 清空购物车
-      await cartStore.clearCart()
-      // 跳转到订单列表
-      router.push('/orders')
+        if (res.data && res.data.code === 200) {
+          ElMessage.success('订单提交成功')
+          await cartStore.clearCart()
+          router.push('/my-orders')
+        }
+      } catch (error) {
+        console.error('提交订单失败:', error)
+      } finally {
+        submitting.value = false
+      }
     }
-  } finally {
-    submitting.value = false
-  }
+  })
 }
 
-// 检查购物车是否为空
-onMounted(() => {
-  if (!cartItems.value.length) {
-    ElMessage.warning('购物车是空的')
-    router.push('/cart')
+// 初始化时获取购物车数据
+onMounted(async () => {
+  try {
+    await cartStore.fetchCartList()
+    if (!cartItems.value.length) {
+      ElMessage.warning('购物车为空')
+      router.push('/menu')
+    }
+  } catch (error) {
+    console.error('获取购物车数据失败:', error)
+    ElMessage.error('获取购物车数据失败')
   }
 })
 </script>
 
 <style scoped lang="scss">
 .checkout-page {
-  padding: 16px;
+  padding: 20px;
   min-height: calc(100vh - 60px);
   background: #f5f5f5;
 }
 
 .checkout-content {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
 
-  .page-header {
+  .checkout-header {
     h3 {
       margin: 0;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
   }
 }
 
-.products-list {
-  margin-bottom: 24px;
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 
-  h4 {
-    margin: 0 0 12px;
-    font-size: 14px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--el-text-color-regular);
-  }
-}
-
-.product-items {
-  .product-item {
-    display: flex;
-    align-items: center;
-    padding: 12px;
-    background: var(--el-fill-color-blank);
-    border: 1px solid var(--el-border-color-lighter);
+  .product-image {
+    width: 60px;
+    height: 60px;
     border-radius: 4px;
-    margin-bottom: 8px;
-
-    .product-image {
-      width: 50px;
-      height: 50px;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-right: 12px;
-    }
-
-    .product-info {
-      flex: 1;
-      min-width: 0;
-
-      .product-name {
-        font-size: 14px;
-        margin-bottom: 4px;
-        color: var(--el-text-color-primary);
-      }
-
-      .product-meta {
-        font-size: 12px;
-        color: var(--el-text-color-secondary);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-
-        .price {
-          color: var(--el-color-danger);
-        }
-
-        .quantity {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-      }
-    }
-
-    .product-total {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--el-color-danger);
-    }
+    overflow: hidden;
   }
+
+  .product-name {
+    font-size: 14px;
+  }
+}
+
+.price, .subtotal {
+  color: var(--el-color-danger);
+  font-weight: 600;
 }
 
 .order-info {
-  margin-bottom: 24px;
-
-  h4 {
-    margin: 0 0 12px;
-    font-size: 14px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--el-text-color-regular);
-  }
-}
-
-.order-form {
-  margin-bottom: 0;
-}
-
-.order-amount {
-  padding: 16px;
-  background: var(--el-fill-color-blank);
-  border: 1px solid var(--el-border-color-lighter);
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--el-fill-color-light);
   border-radius: 4px;
-  margin-bottom: 16px;
-
-  .amount-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--el-text-color-regular);
-    font-size: 14px;
-
-    .price {
-      margin-left: auto;
-      font-weight: 600;
-      color: var(--el-color-danger);
-    }
-  }
 }
 
-.submit-order {
+.order-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--el-border-color-lighter);
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
 
-  .total {
-    font-size: 14px;
-    color: var(--el-text-color-regular);
+  .footer-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 20px;
 
-    .price {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--el-color-danger);
-    }
-  }
-
-  .el-button {
-    padding: 12px 24px;
-    .el-icon {
-      margin-right: 4px;
+    .total-price {
+      font-size: 14px;
+      
+      .price {
+        font-size: 20px;
+        margin-left: 8px;
+      }
     }
   }
 }

@@ -40,8 +40,22 @@
         </el-table-column>
         <el-table-column label="操作" width="250">
           <template #default="scope">
-            <el-button size="small" type="primary" @click="handleViewSalary(scope.row)">查看薪资记录</el-button>
-            <el-button size="small" type="success" @click="handlePay(scope.row)">发放工资</el-button>
+            <el-button 
+              size="small" 
+              type="primary" 
+              @click="handleViewSalary(scope.row)"
+              v-if="hasPermission('api_salary_get')"
+            >
+              查看薪资记录
+            </el-button>
+            <el-button 
+              size="small" 
+              type="success" 
+              @click="handlePay(scope.row)"
+              v-if="hasPermission('api_salary_post')"
+            >
+              发放工资
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -55,9 +69,11 @@
     <!-- 分页 -->
     <div class="pagination-container">
       <el-pagination
-          v-model:current-page="page.index"
-          v-model:page-size="page.size"
+          v-model:currentPage="page.index"
+          v-model:pageSize="page.size"
           :total="page.total"
+          :page-sizes="[10, 20, 50]"
+          background
           layout="total, sizes, prev, pager, next"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -67,14 +83,29 @@
     <!-- 发放工资对话框 -->
     <el-dialog v-model="payDialogVisible" title="发放工资" width="400px">
       <el-form ref="payFormRef" :model="payForm" label-width="100px">
-        <el-form-item label="基础工资" :prop="baseSalary">
-          <el-input-number v-model="selectedUser.base_salary" :disabled="true" style="width: 100%" />
+        <el-form-item label="基础工资">
+          <el-input-number 
+            v-model="selectedUser.base_salary" 
+            :disabled="true" 
+            :precision="2"
+            style="width: 100%" 
+          />
         </el-form-item>
         <el-form-item label="奖金" prop="bonus">
-          <el-input-number v-model="payForm.bonus" :min="0" :precision="2" style="width: 100%" />
+          <el-input-number 
+            v-model="payForm.bonus" 
+            :min="0" 
+            :precision="2" 
+            style="width: 100%" 
+          />
         </el-form-item>
         <el-form-item label="扣款" prop="deduction">
-          <el-input-number v-model="payForm.deduction" :min="0" :precision="2" style="width: 100%" />
+          <el-input-number 
+            v-model="payForm.deduction" 
+            :min="0" 
+            :precision="2" 
+            style="width: 100%" 
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -104,13 +135,37 @@
 
       <div v-if="salaryRecords.length > 0">
         <el-table :data="salaryRecords" style="width: 100%">
-          <el-table-column prop="pay_date" label="发放日期" :formatter="formatDate" />
-          <el-table-column prop="bonus" label="奖金" />
-          <el-table-column prop="deduction" label="扣款" />
-          <el-table-column prop="total_salary" label="总薪资" />
+          <el-table-column prop="pay_date" label="发放日期" />
+          <el-table-column prop="base_salary" label="基本工资">
+            <template #default="scope">
+              {{ scope.row.base_salary.toFixed(2) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="bonus" label="奖金">
+            <template #default="scope">
+              {{ scope.row.bonus.toFixed(2) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="deduction" label="扣款">
+            <template #default="scope">
+              {{ scope.row.deduction.toFixed(2) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="total_salary" label="总薪资">
+            <template #default="scope">
+              {{ scope.row.total_salary.toFixed(2) }}
+            </template>
+          </el-table-column>
           <el-table-column label="操作">
             <template #default="scope">
-              <el-button size="small" type="danger" @click="handleDeleteSalaryRecord(scope.row)">删除</el-button>
+              <el-button 
+                size="small" 
+                type="danger" 
+                @click="handleDeleteSalaryRecord(scope.row)"
+                v-if="hasPermission('api_salary_delete')"
+              >
+                删除
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -131,6 +186,7 @@ import { ElMessage } from 'element-plus';
 import { Search } from '@element-plus/icons-vue';
 import request from '../../utils/request'; // 自定义封装的请求方法
 import { API } from '@/config/api.js'; // API 配置文件
+import { hasPermission } from '../../utils/permissions'; // 导入权限检查函数
 
 const loading = ref(false);
 const users = ref([]);
@@ -158,14 +214,17 @@ const fetchUsers = async () => {
   loading.value = true;
   try {
     const res = await request(API.USER.LIST + `?index=${page.value.index}&size=${page.value.size}&username=${searchQuery.value}&is_employee=true`);
-    if (res.data) {
-      users.value = res.data;
-      page.value.total = res.total;
+    if (res.data && res.data.code === 200) {
+      users.value = res.data.data || [];  // 使用 res.data.data 作为用户列表数据
+      page.value.total = res.data.total;  // 从响应中获取总数
     } else {
       users.value = [];
+      page.value.total = 0;
     }
   } catch (error) {
     ElMessage.error(error.message || '获取用户列表失败');
+    users.value = [];
+    page.value.total = 0;
   } finally {
     loading.value = false;
   }
@@ -178,25 +237,32 @@ const fetchUsersWithSearch = () => {
 
 // 查看薪资记录
 const handleViewSalary = async (user) => {
+  if (!hasPermission('api_salary_get')) {
+    ElMessage.error('您没有权限查看薪资记录');
+    return;
+  }
   selectedUser.value = user;
   loading.value = true;
 
   try {
-    let query = `?index=${page.value.index}&size=${page.value.size}&user_code=${user.code}`;
-
+    // 添加分页参数
+    let query = `?user_code=${user.code}&index=1&size=50`; // 设置较大的 size 以显示更多记录
+    
     // 如果有时间选择，加入查询条件
     if (startDate.value && endDate.value) {
-      const startTime = new Date(startDate.value).getTime();
-      const endTime = new Date(endDate.value).getTime();
+      const startTime = new Date(startDate.value).getTime() / 1000; // 转换为秒级时间戳
+      const endTime = new Date(endDate.value).getTime() / 1000;
       query += `&start_time=${startTime}&end_time=${endTime}`;
     }
 
     const res = await request(API.SALARY.LIST + query);
 
-    if (res.data && res.data.length > 0) {
-      salaryRecords.value = res.data.map(record => ({
+    if (res.data && res.data.code === 200) {
+      // 直接使用返回的数据数组
+      salaryRecords.value = res.data.data.map(record => ({
         ...record,
-        pay_date: formatDate(record.pay_date),
+        // 转换时间戳为日期字符串
+        pay_date: formatDate(record.pay_date * 1000) // 转换为毫秒级时间戳
       }));
     } else {
       salaryRecords.value = [];
@@ -209,33 +275,16 @@ const handleViewSalary = async (user) => {
   }
 };
 
-
-// 格式化时间戳或日期字符串为日期
-const formatDate = (payDate) => {
-  if (!payDate) {
-    return "-";  // 无效日期返回 "-"
-  }
-
-  // 如果是对象类型的 payDate，尝试提取日期字段
-  if (typeof payDate === "object") {
-    payDate = payDate.pay_date || payDate.timestamp || "";
-  }
-
-  // 如果是字符串类型的日期，尝试转换为日期对象
-  if (typeof payDate === "string" && Date.parse(payDate)) {
-    const date = new Date(payDate);
-    return date.toLocaleDateString(); // 格式为 YYYY-MM-DD
-  }
-
-  // 如果是有效的时间戳（秒级或毫秒级）
-  if (!isNaN(payDate) && payDate > 0) {
-    const date = new Date(payDate);
-    return date.toLocaleDateString(); // 格式为 YYYY-MM-DD
-  }
-
-  return "-";
+// 格式化时间戳为日期字符串
+const formatDate = (timestamp) => {
+  if (!timestamp) return '-';
+  const date = new Date(timestamp);
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
 };
-
 
 // 通过时间筛选薪资记录
 const filterByDate = () => {
@@ -248,8 +297,19 @@ const filterByDate = () => {
 
 
 const handlePay = (user) => {
-  selectedUser.value = user;
-  payDialogVisible.value = true;
+  if (!hasPermission('api_salary_post')) {
+    ElMessage.error('您没有权限发放工资');
+    return;
+  }
+  selectedUser.value = {
+    ...user,
+    base_salary: parseFloat(user.base_salary) // 转换为数字类型
+  }
+  payForm.value = {
+    bonus: 0,
+    deduction: 0
+  }
+  payDialogVisible.value = true
 };
 
 // 提交发放工资
@@ -257,47 +317,60 @@ const submitPay = async () => {
   try {
     const res = await request(API.SALARY.CREATE, {
       method: 'POST',
-      body: JSON.stringify({
+      data: {  // 改用 data 而不是 body
         user_code: selectedUser.value.code,
         bonus: payForm.value.bonus,
         deduction: payForm.value.deduction
-      })
-    });
-    ElMessage.success('工资发放成功');
-    payDialogVisible.value = false;
-    fetchUsers();
+      }
+    })
+    
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('工资发放成功')
+      payDialogVisible.value = false
+      fetchUsers()
+    }
   } catch (error) {
-    ElMessage.error('工资发放失败');
+    ElMessage.error('工资发放失败')
   }
 };
 
 
 const handleDeleteSalaryRecord = async (salaryRecord) => {
+  if (!hasPermission('api_salary_delete')) {
+    ElMessage.error('您没有权限删除薪资记录');
+    return;
+  }
   try {
     await request(API.SALARY.DELETE + `?code=${salaryRecord.code}`, {
       method: 'DELETE'
     });
     ElMessage.success('薪资记录删除成功');
-    fetchUsers();
+    // 重新获取当前用户的薪资记录
+    handleViewSalary(selectedUser.value);
   } catch (error) {
     ElMessage.error('删除薪资记录失败');
   }
 };
 
-// 分页大小变化
-const handleSizeChange = (size) => {
-  page.value.size = size;
+// 分页处理函数
+const handleSizeChange = (val) => {
+  page.value.size = val;
+  page.value.index = 1;  // 切换每页数量时重置到第一页
   fetchUsers();
 };
 
-// 当前页码变化
-const handleCurrentChange = (pageNumber) => {
-  page.value.index = pageNumber;
+const handleCurrentChange = (val) => {
+  page.value.index = val;
   fetchUsers();
 };
 
 // 初始化数据
 onMounted(() => {
+  // 检查是否有查看薪资的基本权限
+  if (!hasPermission('api_salary_get')) {
+    ElMessage.error('您没有权限访问此页面');
+    return;
+  }
   fetchUsers();
 });
 </script>

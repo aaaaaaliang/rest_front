@@ -42,18 +42,21 @@
           </template>
         </el-dropdown>
         
-        <template v-if="isLoggedIn">
+        <template v-if="userStore.user">
           <el-dropdown>
             <span class="user-dropdown">
-              {{ username }}
-              <el-icon><ArrowDown /></el-icon>
+              <el-avatar :size="32" :icon="UserFilled" />
+              <span>{{ userStore.user.username }}</span>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item>
-                  <router-link to="/profile">个人信息</router-link>
+                  <router-link to="/profile" class="edit-profile">
+                    <el-icon><User /></el-icon>
+                    <span>编辑资料</span>
+                  </router-link>
                 </el-dropdown-item>
-                <el-dropdown-item @click="handleLogout">
+                <el-dropdown-item divided @click="handleLogout">
                   退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -76,6 +79,8 @@
       <p>© 2024 餐厅点餐系统 版权所有</p>
     </el-footer>
     <customer-service />
+
+   
   </div>
 </template>
 
@@ -84,24 +89,89 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '../stores/cart'
 import { useThemeStore } from '../stores/theme'
-import { Sunny, Moon, Monitor, Brush } from '@element-plus/icons-vue'
+import { useUserStore } from '../stores/user'
+import { ElMessage } from 'element-plus'
+import { 
+  Sunny, 
+  Moon, 
+  Monitor, 
+  Brush, 
+  ShoppingCart,
+  UserFilled,
+  User
+} from '@element-plus/icons-vue'
 import CustomerService from '../components/CustomerService.vue'
+import request from '../utils/request'
+import { API } from '../config/api'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 const themeStore = useThemeStore()
+const userStore = useUserStore()
 
 const activeMenu = computed(() => route.path)
-const cartCount = computed(() => cartStore.totalCount)
+const cartCount = computed(() => cartStore.count)
 
-// 模拟用户状态
-const isLoggedIn = computed(() => localStorage.getItem('token'))
-const username = ref('用户名')
+const showUserInfoDialog = ref(false)
+const userFormRef = ref(null)
+const userForm = ref({
+  username: '',
+  nickname: '',
+  phone: '',
+  email: '',
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
 
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  router.push('/login')
+const userRules = {
+  nickname: [
+    { max: 20, message: '昵称长度不能超过20个字符', trigger: 'blur' }
+  ],
+  phone: [
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ],
+  email: [
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+  ],
+  newPassword: [
+    { min: 6, message: '密码长度不能小于6个字符', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    {
+      validator: (rule, value, callback) => {
+        if (userForm.value.newPassword && value !== userForm.value.newPassword) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+const handleLogout = async () => {
+  try {
+    // 调用退出登录接口
+    const res = await request(API.USER.LOGOUT)
+
+    if (res.data && res.data.code === 200) {
+      // 清除用户状态
+      userStore.logout()
+      ElMessage.success('退出成功')
+      // 跳转到登录页
+      router.push('/login')
+    } else {
+      ElMessage.error(res.data?.message || '退出失败')
+    }
+  } catch (error) {
+    console.error('退出失败:', error)
+    // 即使接口调用失败，也清除本地状态并跳转
+    userStore.logout()
+    router.push('/login')
+  }
 }
 
 // 切换主题
@@ -111,6 +181,32 @@ const switchTheme = (mode) => {
     mode
   })
   localStorage.setItem('theme', JSON.stringify(themeStore.$state))
+}
+
+// 更新用户信息
+const handleUpdateUserInfo = async () => {
+  if (!userFormRef.value) return
+  
+  try {
+    await userFormRef.value.validate()
+    const updateData = {
+      nickname: userForm.value.nickname,
+      phone: userForm.value.phone,
+      email: userForm.value.email
+    }
+
+    if (userForm.value.newPassword) {
+      updateData.old_password = userForm.value.oldPassword
+      updateData.new_password = userForm.value.newPassword
+    }
+
+    await userStore.updateUserInfo(updateData)
+    ElMessage.success('更新成功')
+    showUserInfoDialog.value = false
+  } catch (error) {
+    console.error('更新失败:', error)
+    ElMessage.error(error.message || '更新失败')
+  }
 }
 </script>
 
@@ -150,10 +246,12 @@ const switchTheme = (mode) => {
 }
 
 .user-dropdown {
-  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .footer {
@@ -172,5 +270,38 @@ const switchTheme = (mode) => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.user-info {
+  padding: 8px;
+  min-width: 200px;
+}
+
+.info-item {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-item .label {
+  color: var(--el-text-color-secondary);
+  width: 60px;
+}
+
+.role-tag {
+  margin-right: 4px;
+}
+
+.edit-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--el-text-color-regular);
+}
+
+.edit-profile:hover {
+  color: var(--el-color-primary);
 }
 </style> 

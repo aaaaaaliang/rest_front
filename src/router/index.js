@@ -1,6 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useUserStore } from '../stores/user'
+import { ElMessage } from 'element-plus'
+import { nextTick } from 'vue'
 
 const routes = [
+  {
+    path: '/login/github/callback',
+    name: 'GithubCallback',
+    component: () => import('../views/Login.vue'),
+    meta: {
+      title: 'GitHub 登录'
+    }
+  },
   {
     path: '/login',
     name: 'Login',
@@ -19,7 +30,10 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('../views/admin/Dashboard.vue'),
-        meta: { requiresAuth: true }
+        meta: { 
+          requiresAuth: true,
+          permission: { method: 'GET', path: '/api/dashboard' }
+        }
       },
       {
         path: 'user',
@@ -61,12 +75,12 @@ const routes = [
         component: () => import('../views/admin/SystemConfig.vue'),
         meta: { requiresAuth: true }
       },
-      {
-        path: 'images',
-        name: 'ImageManagement',
-        component: () => import('../views/admin/ImageManagement.vue'),
-        meta: { requiresAuth: true }
-      },
+      // {
+      //   path: 'images',
+      //   name: 'ImageManagement',
+      //   component: () => import('../views/admin/ImageManagement.vue'),
+      //   meta: { requiresAuth: true }
+      // },
       {
         path: 'categories',
         name: 'CategoryManagement',
@@ -120,7 +134,10 @@ const routes = [
         path: 'checkout',
         name: 'Checkout',
         component: () => import('../views/client/Checkout.vue'),
-        meta: { requiresAuth: true }
+        meta: {
+          requiresAuth: true,
+          layout: 'client'
+        }
       }
     ]
   },
@@ -151,8 +168,36 @@ const router = createRouter({
 })
 
 // 修改路由守卫
-router.beforeEach((to, from, next) => {
-  // 暂时移除登录检查
+router.beforeEach(async (to, from, next) => {
+  const userStore = useUserStore()
+  
+  // 如果是登录页面，直接通过
+  if (to.path === '/login' || to.path === '/login/github/callback') {
+    next()
+    return
+  }
+
+  // 如果没有用户信息，尝试获取
+  if (!userStore.user) {
+    try {
+      await userStore.fetchUserRole()
+    } catch (error) {
+      // 如果获取失败且页面需要认证，跳转到登录页
+      if (to.meta.requiresAuth) {
+        next('/login')
+        return
+      }
+    }
+  }
+
+  // 如果访问管理页面，检查角色
+  if (to.path.startsWith('/admin')) {
+    if (!userStore.roles || userStore.roles.length === 0) {
+      next('/')
+      return
+    }
+  }
+
   next()
 })
 

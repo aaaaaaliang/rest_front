@@ -14,7 +14,7 @@
         <el-col :span="6" v-for="dish in featuredDishes" :key="dish.code">
           <el-card :body-style="{ padding: '0px' }" class="dish-card">
             <el-image
-              :src="dish.picture?.code"
+              :src="dish.picture?.code || ''"
               class="dish-image"
               fit="cover"
             >
@@ -26,7 +26,7 @@
             </el-image>
             <div class="dish-info">
               <h3>{{ dish.products_name }}</h3>
-              <p class="price">¥{{ dish.price.toFixed(2) }}</p>
+              <p class="price">¥{{ (dish.price ?? 0).toFixed(2) }}</p>
               <el-button type="primary" @click="handleOrder(dish)">
                 立即点餐
               </el-button>
@@ -75,6 +75,8 @@ import { useCartStore } from '../../stores/cart'
 import request from '../../utils/request'
 import { API } from '../../config/api'
 import { Picture } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+
 
 const router = useRouter()
 const cartStore = useCartStore()
@@ -90,7 +92,9 @@ const fetchBanners = async () => {
       size: 10,
     })
     const res = await request(`${API.BANNER.LIST}?${params}`)
-    bannerList.value = res.data || []
+    if (res.data && res.data.code === 200) {
+      bannerList.value = res.data.data || []
+    }
   } catch (error) {
     console.error('获取轮播图失败:', error)
   }
@@ -104,19 +108,29 @@ const fetchFeaturedDishes = async () => {
   try {
     const params = new URLSearchParams({
       index: 1,
-      size: 4,  // 显示4个特色菜品
-      main: 1   // 获取标记为特色的菜品
+      size: 4,
+      main: 1
     })
     const res = await request(`${API.PRODUCT.LIST}?${params}`)
-    featuredDishes.value = res.data || []
+    if (res.data && res.data.code === 200) {
+      featuredDishes.value = res.data.data || []
+    }
   } catch (error) {
     console.error('获取特色菜品失败:', error)
   }
 }
 
-const handleOrder = (dish) => {
-  cartStore.addToCart(dish)
-  router.push('/menu')
+const handleOrder = async (dish) => {
+  try {
+    const res = await cartStore.addToCart(dish)
+    if (res && res.data && res.data.code === 200) {
+      ElMessage.success('加入购物车成功')
+      router.push('/menu')
+    }
+  } catch (error) {
+    console.error('加入购物车失败:', error)
+    ElMessage.error(error.message || '加入购物车失败')
+  }
 }
 
 // 初始化
