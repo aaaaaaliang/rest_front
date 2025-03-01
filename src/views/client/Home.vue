@@ -125,7 +125,7 @@ const handleOrder = async (dish) => {
     const res = await cartStore.addToCart(dish)
     if (res && res.data && res.data.code === 200) {
       ElMessage.success('加入购物车成功')
-      router.push('/menu')
+      await router.push('/menu')
     }
   } catch (error) {
     console.error('加入购物车失败:', error)

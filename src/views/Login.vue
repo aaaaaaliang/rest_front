@@ -351,7 +351,9 @@ const handleRegister = async () => {
 }
 
 const handleGithubLogin = () => {
+  console.log(API.BASE_URL + API.USER.GITHUB_LOGIN)
   window.location.href = API.BASE_URL + API.USER.GITHUB_LOGIN
+  console.log("1")
 }
 
 // GitHub 登录回调处理

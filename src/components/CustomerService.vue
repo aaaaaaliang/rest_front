@@ -66,6 +66,7 @@ import { ref, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { Service } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { API } from '../config/api'
 
 const showDrawer = ref(false)
 const inputMessage = ref('')
@@ -102,7 +103,7 @@ const connectWebSocket = async () => {
   }
 
   try {
-    const wsUrl = `http://localhost:8888/api/ws`
+    const wsUrl = API.WS.GET
     console.log('正在连接WebSocket:', wsUrl)
     
     socket.value = new WebSocket(wsUrl)

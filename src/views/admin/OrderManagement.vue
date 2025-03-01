@@ -28,8 +28,8 @@
         :data="orders" 
         style="width: 100%"
       >
-        <el-table-column label="订单编号" prop="code" width="200" />
-
+        <el-table-column label="订单编号" prop="code" width="100" />
+        <el-table-column label="用户" prop="user_name" width="100" />
         <el-table-column label="订单详情" min-width="200">
           <template #default="{ row }">
             <div class="order-products">
@@ -45,8 +45,13 @@
             </div>
           </template>
         </el-table-column>
+        
+        <el-table-column label="订单创建时间" width="200">
+          <template #default="{ row }">
+            <span>{{ formatDate(row.created) }}</span>
+          </template>
+        </el-table-column>
 
-        <el-table-column label="订单创建时间" prop="created" width="200" />
 
         <el-table-column prop="total_price" label="实付款" width="120" align="center">
           <template #default="{ row }">
@@ -192,6 +197,26 @@ const form = ref({
   remark: '',
   version: 1
 })
+
+// const formatDate = (timestamp) => {
+//   if (timestamp) {
+//     const date = new Date(timestamp);  // 将时间戳转为 Date 对象
+//     return date.toLocaleString();  // 返回格式化后的日期（根据用户的本地设置）
+//   }
+//   return '';
+// };
+const formatDate = (timestamp) => {
+  if (timestamp) {
+    // 如果传入的是秒级时间戳，需要乘以 1000 转换为毫秒级时间戳
+    if (timestamp.toString().length === 10) {
+      timestamp *= 1000; // 转换为毫秒级
+    }
+    const date = new Date(timestamp);
+    return date.toLocaleString();  // 格式化为本地时间
+  }
+  return '';
+};
+
 
 // 表单校验规则
 const rules = {

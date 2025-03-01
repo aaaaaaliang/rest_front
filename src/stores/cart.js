@@ -3,11 +3,13 @@ import { ref, computed } from 'vue'
 import request from '../utils/request'
 import { API } from '../config/api'
 import { ElMessage } from 'element-plus'
-
+import router from '../router'
+import axios from 'axios';
 export const useCartStore = defineStore('cart', () => {
   const items = ref([])
   const total = ref(0)
   const count = ref(0)  // 添加购物车数量
+
 
   // 计算总价
   const totalPrice = computed(() => {
@@ -60,25 +62,38 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
+
   // 添加到购物车
   const addToCart = async (product) => {
+    console.log('Product data:', product.code);  // 打印 product 对象，确保它有值
+
+    // 获取购物车中该商品的当前数量
+    let existingProductNum = cartItems.value.find(item => item.product_code === product.code)?.select_num || 0;
+    // 设置增量为 1（每次添加 1 个商品）
+    const increment = 1;
+
     try {
+      // 发送请求给后端，传递增量
       await request(API.CART.ADD, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
+        data: JSON.stringify({
           product_code: product.code,
-          product_num: 1
+          product_num: increment  // 传递增量
         })
-      })
-      
-      await fetchCartList()
+      });
+
+      // 重新获取购物车列表
+      await fetchCartList();
+      await router.push("/menu");  // 假设你想跳转到其他页面
     } catch (error) {
-      ElMessage.error('添加到购物车失败')
+      ElMessage.error('添加到购物车失败');
     }
-  }
+  };
+
+
 
   // 更新商品数量
   const updateQuantity = async (productCode, quantity) => {

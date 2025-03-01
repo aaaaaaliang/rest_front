@@ -1,7 +1,8 @@
 import { List } from "echarts";
 
 export const API = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  // BASE_URL: import.meta.env.VITE_API_BASE_URL,
+   BASE_URL: "http://localhost:8888",
   
   USER: {
     LOGIN: '/api/user/login',

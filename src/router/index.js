@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import { nextTick } from 'vue'
@@ -163,13 +163,17 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes
 })
 
 // 修改路由守卫
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
+
+  console.log('当前路径:', to.path) // 打印当前路径
+  console.log('用户信息:', userStore.user) // 打印用户信息
+  console.log('用户角色:', userStore.roles) // 打印用户角色
   
   // 如果是登录页面，直接通过
   if (to.path === '/login' || to.path === '/login/github/callback') {

@@ -144,7 +144,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Picture } from '@element-plus/icons-vue'
 import { hasPermission } from '../../utils/permissions'  // 导入权限检查函数
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL
+const baseUrl = "http://localhost:8888"
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)

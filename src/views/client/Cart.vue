@@ -31,7 +31,7 @@
                       <el-icon><Picture /></el-icon>
                     </div>
                   </template>
-                </el-image>
+                </el-image> 
                 <span class="product-name">{{ row.product_name }}</span>
               </div>
             </template>
@@ -46,14 +46,22 @@
           <el-table-column label="数量" width="150" align="center">
             <template #default="{ row }">
               <el-input-number
-                v-model="row.select_num"
-                :min="1"
-                :max="99"
-                size="small"
-                @change="(value) => handleQuantityChange(row, value)"
+                  v-model="row.select_num"
+                  :min="1"
+                  :max="99"
+                  size="small"
+                  :controls="true"
+                  :controls-position="'right'"
+                  @change="(value) => handleQuantityChange(row, value)"
               />
             </template>
           </el-table-column>
+
+
+
+
+
+
 
           <el-table-column label="小计" width="120" align="center">
             <template #default="{ row }">
@@ -158,26 +166,26 @@ const fetchCartList = async () => {
   }
 }
 
-// 更新商品数量
+
 const handleQuantityChange = async (item, value) => {
   try {
     const res = await request(API.CART.ADD, {
       method: 'POST',
       data: {
         product_code: item.product_code,
-        product_num: value
+        product_num: value  // 直接传递新值
       }
-    })
-    
+    });
+
     if (res.data && res.data.code === 200) {
-      ElMessage.success('更新成功')
-      await fetchCartList()
+      ElMessage.success('更新成功');
+      await fetchCartList();  // 刷新购物车
     }
   } catch (error) {
-    ElMessage.error('更新数量失败')
-    console.error('更新数量失败:', error)
+    ElMessage.error('更新数量失败');
+    console.error('更新数量失败:', error);
   }
-}
+};
 
 // 删除商品
 const handleRemove = async (item) => {

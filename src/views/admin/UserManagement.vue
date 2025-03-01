@@ -128,16 +128,28 @@
         <el-form-item label="密码" prop="password" v-if="dialogType === 'add'">
           <el-input v-model="userForm.password" type="password" show-password />
         </el-form-item>
+<!--        <el-form-item label="是否为员工" label-width="120px">-->
+<!--        <el-switch v-model="userForm.is_employee" />-->
+<!--        </el-form-item>-->
+
+<!--        <el-form-item label="基础工资" v-if="userForm.is_employee">-->
+<!--          <el-input v-model="userForm.base_salary" type="number" placeholder="请输入基础工资" />-->
+<!--        </el-form-item>-->
+<!--        <el-form-item label="真实姓名" v-if="userForm.is_employee">-->
+<!--          <el-input v-model="userForm.real_name"placeholder="请输入真实名字" />-->
+<!--        </el-form-item>-->
+
         <el-form-item label="是否为员工" label-width="120px">
-        <el-switch v-model="userForm.is_employee" />
+          <el-switch v-model="userForm.is_employee" />
         </el-form-item>
 
         <el-form-item label="基础工资" v-if="userForm.is_employee">
           <el-input v-model="userForm.base_salary" type="number" placeholder="请输入基础工资" />
         </el-form-item>
         <el-form-item label="真实姓名" v-if="userForm.is_employee">
-          <el-input v-model="userForm.real_name"placeholder="请输入真实名字" />
+          <el-input v-model="userForm.real_name" placeholder="请输入真实名字" />
         </el-form-item>
+
 
       </el-form>
       <template #footer>
@@ -220,7 +232,7 @@ const userForm = ref({
   phone: '',
   password: '',
   is_employee: false, // 是否为员工
-  base_salary: null,   // 基础工资
+  base_salary: 0,   // 基础工资
   real_name:"",
 })
 
@@ -322,21 +334,63 @@ const handleAdd = () => {
 }
 
 // 编辑用户
+// const handleEdit = (row) => {
+//   dialogType.value = 'edit'
+//   userForm.value = { ...row }
+//   dialogVisible.value = true
+// }
+
+// 编辑用户
 const handleEdit = (row) => {
   dialogType.value = 'edit'
+
+  // 如果有基础工资字段，标记为员工
+  if (row.base_salary>0) {
+    row.is_employee = true;
+  } else {
+    row.is_employee = false;
+  }
+
+  // 回显用户数据
   userForm.value = { ...row }
+
   dialogVisible.value = true
 }
+
+
+
+
+// 删除用户
+// const handleDelete = async (row) => {
+//   try {
+//     await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
+//       type: 'warning'
+//     })
+//     await request(API.USER.DELETE + `/${row.id}`, {
+//       method: 'DELETE'
+//     })
+//     ElMessage.success('删除成功')
+//     fetchUsers()
+//   } catch (error) {
+//     if (error !== 'cancel') {
+//       ElMessage.error('删除失败')
+//     }
+//   }
+// }
 
 // 删除用户
 const handleDelete = async (row) => {
   try {
+    // 使用 query 参数删除用户
     await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
       type: 'warning'
     })
-    await request(API.USER.DELETE + `/${row.id}`, {
+
+    // 将 user.code 替换为 row.user_code
+    await request(`${API.USER.DELETE}?user_code=${row.code}`, {
       method: 'DELETE'
     })
+
     ElMessage.success('删除成功')
     fetchUsers()
   } catch (error) {
@@ -346,33 +400,134 @@ const handleDelete = async (row) => {
   }
 }
 
+
+
 // 提交表单
+// const handleSubmit = async () => {
+//   try {
+//
+//     if (userForm.value.is_employee && userForm.value.base_salary) {
+//       userForm.value.base_salary = parseFloat(userForm.value.base_salary)
+//       ElMessage.error('基础工资必须是数字');
+//     }
+//
+//     if (dialogType.value === 'add') {
+//       await request(API.USER.ADDUSER, {
+//         method: 'POST',
+//         data: userForm.value
+//       })
+//       ElMessage.success('新增成功')
+//     } else {
+//       await request(API.USER.UPDATE, {
+//         method: 'PUT',
+//         data: userForm.value
+//       })
+//       ElMessage.success('编辑成功')
+//     }
+//
+//     dialogVisible.value = false
+//     fetchUsers()
+//   } catch (error) {
+//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败')
+//   }
+// }
+// 提交表单
+// const handleSubmit = async () => {
+//   try {
+//     // 如果是员工并且基础工资字段存在，确保它是数字类型
+//     if (userForm.value.is_employee && userForm.value.base_salary) {
+//       userForm.value.base_salary = parseFloat(userForm.value.base_salary);
+//     }
+//
+//     // 检查基础工资是否为有效的数字
+//     if (userForm.value.is_employee && isNaN(userForm.value.base_salary)) {
+//       ElMessage.error('基础工资必须是有效的数字');
+//       return;
+//     }
+//
+//     // 根据对话框类型判断新增或编辑
+//     if (dialogType.value === 'add') {
+//       await request(API.USER.ADDUSER, {
+//         method: 'POST',
+//         data: userForm.value
+//       });
+//       ElMessage.success('新增成功');
+//     } else {
+//       await request(API.USER.UPDATE, {
+//         method: 'PUT',
+//         data: userForm.value
+//       });
+//       ElMessage.success('编辑成功');
+//     }
+//
+//     dialogVisible.value = false;
+//     fetchUsers();  // 刷新用户列表
+//   } catch (error) {
+//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败');
+//   }
+// }
+// const handleSubmit = async () => {
+//   try {
+//     // 检查是否是员工并确保 base_salary 为数字类型
+//     if (userForm.value.is_employee) {
+//       // 如果没有基础工资，设置为0
+//       userForm.value.base_salary = parseFloat(userForm.value.base_salary) || 0; // 防止传递空字符串或非数字
+//     } else {
+//       userForm.value.base_salary = 0; // 如果不是员工，直接设置为0
+//     }
+
+//     if (dialogType.value === 'add') {
+//       await request(API.USER.ADDUSER, {
+//         method: 'POST',
+//         data: userForm.value
+//       });
+//       ElMessage.success('新增成功');
+//     } else {
+//       await request(API.USER.UPDATE, {
+//         method: 'PUT',
+//         data: userForm.value
+//       });
+//       ElMessage.success('编辑成功');
+//     }
+
+//     dialogVisible.value = false;
+//     fetchUsers();
+//   } catch (error) {
+//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败');
+//   }
+// }
+
 const handleSubmit = async () => {
   try {
-    if (userForm.value.is_employee && userForm.value.base_salary) {
-      userForm.value.base_salary = parseFloat(userForm.value.base_salary)
+    // 检查是否是员工并确保 base_salary 为数字类型
+    if (userForm.value.is_employee) {
+      // 如果没有基础工资，设置为0
+      userForm.value.base_salary = parseFloat(userForm.value.base_salary) || 0; // 防止传递空字符串或非数字
+    } else {
+      userForm.value.base_salary = 0; // 如果不是员工，直接设置为0
     }
 
     if (dialogType.value === 'add') {
       await request(API.USER.ADDUSER, {
         method: 'POST',
         data: userForm.value
-      })
-      ElMessage.success('新增成功')
+      });
+      ElMessage.success('新增成功');
     } else {
-      await request(API.USER.UPDATE + `/${userForm.value.id}`, {
+      await request(API.USER.UPDATE, {
         method: 'PUT',
         data: userForm.value
-      })
-      ElMessage.success('编辑成功')
+      });
+      ElMessage.success('编辑成功');
     }
 
-    dialogVisible.value = false
-    fetchUsers()
+    dialogVisible.value = false;
+    fetchUsers();
   } catch (error) {
-    ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败')
+    ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败');
   }
 }
+
 
 // 分配角色
 const handleAssignRole = async (row) => {
