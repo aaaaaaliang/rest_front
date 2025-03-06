@@ -14,9 +14,9 @@
         <el-col :span="6" v-for="dish in featuredDishes" :key="dish.code">
           <el-card :body-style="{ padding: '0px' }" class="dish-card">
             <el-image
-              :src="dish.picture?.code || ''"
-              class="dish-image"
-              fit="cover"
+                :src="dish.picture?.code || ''"
+                class="dish-image"
+                fit="cover"
             >
               <template #error>
                 <div class="image-placeholder">
@@ -71,15 +71,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCartStore } from '../../stores/cart'
 import request from '../../utils/request'
 import { API } from '../../config/api'
 import { Picture } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-
 const router = useRouter()
-const cartStore = useCartStore()
 
 // 轮播图数据
 const bannerList = ref([])
@@ -120,23 +117,51 @@ const fetchFeaturedDishes = async () => {
   }
 }
 
-const handleOrder = async (dish) => {
+// 购物车数量
+const cartCount = ref(0)
+
+// **获取购物车数量**
+const fetchCartCount = async () => {
   try {
-    const res = await cartStore.addToCart(dish)
-    if (res && res.data && res.data.code === 200) {
-      ElMessage.success('加入购物车成功')
-      await router.push('/menu')
+    const res = await request(API.CART.COUNT, { method: 'GET' })
+    if (res.data && res.data.code === 200) {
+      cartCount.value = res.data.data.count || 0
     }
   } catch (error) {
-    console.error('加入购物车失败:', error)
-    ElMessage.error(error.message || '加入购物车失败')
+    console.error('获取购物车数量失败:', error)
   }
 }
 
-// 初始化
+// **处理加入购物车**
+const handleOrder = async (dish) => {
+  try {
+    const res = await request(API.CART.ADD, {
+      method: 'POST',
+      data: {
+        product_code: dish.code,  // 商品编号
+        product_num: 1  // 商品数量
+      }
+    })
+
+    if (res.data && res.data.code === 200) {
+      ElMessage.success('已添加到购物车')
+      fetchCartCount() // ✅ 更新购物车数量
+    }
+  } catch (error) {
+    if (error.response?.status === 401) {
+      ElMessage.warning('请先登录')
+      router.push('/login')
+    } else {
+      ElMessage.error(error.message || '添加失败')
+    }
+  }
+}
+
+// **初始化数据**
 onMounted(() => {
   fetchBanners()
   fetchFeaturedDishes()
+  fetchCartCount() // ✅ 获取购物车数量
 })
 </script>
 
@@ -177,8 +202,9 @@ onMounted(() => {
 
 .dish-image {
   width: 100%;
-  height: 200px;
+  height: 180px; /* ✅ 调整图片大小 */
   object-fit: cover;
+  border-radius: 8px;
 }
 
 .dish-info {
@@ -238,4 +264,4 @@ onMounted(() => {
   background: var(--el-fill-color-light);
   color: var(--el-text-color-secondary);
 }
-</style> 
+</style>

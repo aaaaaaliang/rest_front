@@ -81,7 +81,7 @@ export const API = {
     LIST:"/api/dashboard"
   },
   WS:{
-    GET:"/api/ws"
+    GET:"ws://localhost:8888/api/ws"
   },
   PERMISSION: {
     LIST: '/api/role/permissions'
@@ -90,5 +90,8 @@ export const API = {
     LIST: '/api/images',
     UPLOAD: '/api/image/upload',
     DELETE: '/api/image'
-  }
+  },
+  PAY: {
+    GET: "/api/pay", // 获取支付宝支付链接
+  },
 } 

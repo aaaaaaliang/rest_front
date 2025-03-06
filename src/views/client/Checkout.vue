@@ -51,7 +51,7 @@
 
       <!-- 订单信息 -->
       <div class="order-info">
-        <el-form 
+        <el-form
           ref="orderFormRef"
           :model="orderForm"
           :rules="orderRules"
@@ -79,8 +79,8 @@
           <div class="total-price">
             合计：<span class="price">¥{{ totalPrice.toFixed(2) }}</span>
           </div>
-          <el-button 
-            type="primary" 
+          <el-button
+            type="primary"
             size="large"
             :loading="submitting"
             @click="handleSubmitOrder"
@@ -153,7 +153,7 @@ const handleSubmitOrder = async () => {
     ElMessage.warning('购物车为空，无法提交订单')
     return
   }
-  
+
   await orderFormRef.value.validate(async (valid) => {
     if (valid) {
       submitting.value = true
@@ -172,7 +172,7 @@ const handleSubmitOrder = async () => {
         if (res.data && res.data.code === 200) {
           ElMessage.success('订单提交成功')
           await cartStore.clearCart()
-          router.push('/my-orders')
+          router.push('/orders')
         }
       } catch (error) {
         console.error('提交订单失败:', error)
@@ -263,7 +263,7 @@ onMounted(async () => {
 
     .total-price {
       font-size: 14px;
-      
+
       .price {
         font-size: 20px;
         margin-left: 8px;
@@ -281,4 +281,4 @@ onMounted(async () => {
   background: var(--el-fill-color-light);
   color: var(--el-text-color-secondary);
 }
-</style> 
+</style>
