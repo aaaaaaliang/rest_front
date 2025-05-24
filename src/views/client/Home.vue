@@ -54,11 +54,11 @@
               </li>
               <li>
                 <el-icon><Location /></el-icon>
-                <span>地址：北京市朝阳区xxx街道xxx号</span>
+                <span>地址：郑州市巩义市 紫荆路136号</span>
               </li>
               <li>
                 <el-icon><Phone /></el-icon>
-                <span>电话：010-12345678</span>
+                <span>电话：175 9692 5325</span>
               </li>
             </ul>
           </div>

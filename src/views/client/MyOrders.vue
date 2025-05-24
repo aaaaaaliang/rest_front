@@ -11,30 +11,59 @@
         <el-table :data="orders" style="width: 100%">
           <el-table-column prop="code" label="订单编号" width="220" />
 
-          <el-table-column label="订单详情">
+          <el-table-column label="订单信息" min-width="300">
             <template #default="{ row }">
-              <div v-for="item in row.order_detail" :key="item.product_code" class="order-item">
-                <el-image
-                    :src="item.picture"
-                    fit="cover"
-                    class="product-image"
-                    style="width: 50px; height: 50px;"
-                >
-                  <template #error>
-                    <div class="image-placeholder">
-                      <el-icon><Picture /></el-icon>
+              <div class="order-info">
+                <div class="order-header">
+                  <div class="table-info">
+                    <el-icon><Location /></el-icon>
+                    <span>餐桌号：{{ row.table_no }}</span>
+                  </div>
+                  <div class="customer-info">
+                    <el-icon><User /></el-icon>
+                    <span>顾客：{{ row.customer }}</span>
+                  </div>
+                </div>
+                <div class="order-details">
+                  <div v-for="item in row.order_detail" :key="item.product_code" class="order-item">
+                    <el-image
+                      :src="item.picture"
+                      fit="cover"
+                      class="product-image"
+                    >
+                      <template #error>
+                        <div class="image-placeholder">
+                          <el-icon><Picture /></el-icon>
+                        </div>
+                      </template>
+                    </el-image>
+                    <div class="item-info">
+                      <span class="product-name">{{ item.product_name }}</span>
+                      <div class="item-meta">
+                        <span class="price">¥{{ item.price.toFixed(2) }}</span>
+                        <span class="quantity">x{{ item.quantity }}</span>
+                      </div>
                     </div>
-                  </template>
-                </el-image>
-                <span class="product-name">{{ item.product_name }}</span>
-                <span class="quantity">x{{ item.quantity }}</span>
+                  </div>
+                </div>
+                <div v-if="row.remark" class="order-remark">
+                  <el-icon><ChatDotRound /></el-icon>
+                  <span>备注：{{ row.remark }}</span>
+                </div>
               </div>
             </template>
           </el-table-column>
 
           <el-table-column prop="total_price" label="总价" width="120">
             <template #default="{ row }">
-              <span class="price">¥{{ row.total_price.toFixed(2) }}</span>
+              <div class="price-info">
+                <div v-if="row.coupon_amount" class="original-price">
+                  ¥{{ row.total_price.toFixed(2) }}
+                </div>
+                <div class="final-price">
+                  ¥{{ (row.coupon_amount || row.total_price).toFixed(2) }}
+                </div>
+              </div>
             </template>
           </el-table-column>
 
@@ -95,7 +124,7 @@
 import { onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Picture } from "@element-plus/icons-vue";
+import { Picture, Location, User, ChatDotRound } from "@element-plus/icons-vue";
 import request from "../../utils/request";
 import { API } from "../../config/api";
 
@@ -312,7 +341,7 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .disabled-text {
   color: gray;
   font-size: 14px;
@@ -344,5 +373,122 @@ onUnmounted(() => {
   font-size: 12px;
   color: red;
   margin-top: 5px;
+}
+
+.order-info {
+  padding: 12px;
+  background: var(--el-fill-color-light);
+  border-radius: 8px;
+
+  .order-header {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    .table-info, .customer-info {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--el-text-color-regular);
+      font-size: 14px;
+
+      .el-icon {
+        font-size: 16px;
+        color: var(--el-color-primary);
+      }
+    }
+  }
+
+  .order-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .order-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px;
+      background: var(--el-bg-color);
+      border-radius: 6px;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateX(4px);
+        box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+      }
+
+      .product-image {
+        width: 50px;
+        height: 50px;
+        border-radius: 6px;
+        object-fit: cover;
+      }
+
+      .item-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .product-name {
+          font-size: 14px;
+          color: var(--el-text-color-primary);
+        }
+
+        .item-meta {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 13px;
+
+          .price {
+            color: var(--el-color-danger);
+            font-weight: 600;
+          }
+
+          .quantity {
+            color: var(--el-text-color-secondary);
+          }
+        }
+      }
+    }
+  }
+
+  .order-remark {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--el-text-color-secondary);
+    font-size: 13px;
+
+    .el-icon {
+      color: var(--el-color-info);
+    }
+  }
+}
+
+.price-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  
+  .original-price {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+    text-decoration: line-through;
+  }
+  
+  .final-price {
+    font-size: 16px;
+    color: var(--el-color-danger);
+    font-weight: 600;
+  }
 }
 </style>

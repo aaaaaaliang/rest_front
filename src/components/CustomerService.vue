@@ -13,7 +13,7 @@
     <el-drawer v-model="showDrawer" title="在线客服" direction="rtl" size="600px">
       <template #header>
         <div class="drawer-header">
-          <span>在线客服</span>
+          <span>餐厅智能助手</span>
           <el-tag :type="isConnected ? 'success' : 'danger'" size="small">
             {{ isConnected ? '已连接' : '未连接' }}
           </el-tag>

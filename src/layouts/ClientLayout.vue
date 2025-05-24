@@ -8,10 +8,13 @@
         mode="horizontal"
         :router="true"
         :default-active="activeMenu"
+        class="nav-menu"
+        :ellipsis="false"
       >
         <el-menu-item index="/">首页</el-menu-item>
         <el-menu-item index="/menu">点餐</el-menu-item>
         <el-menu-item index="/orders">我的订单</el-menu-item>
+        <el-menu-item index="/coupon-center">领券中心</el-menu-item>
       </el-menu>
       <div class="user-actions">
         <router-link to="/cart" class="cart-link">
@@ -50,11 +53,17 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>
-                  <router-link to="/profile" class="edit-profile">
+                <el-dropdown-item @click="showUserInfoDialog = true">
+                  <div class="edit-profile">
                     <el-icon><User /></el-icon>
                     <span>编辑资料</span>
-                  </router-link>
+                  </div>
+                </el-dropdown-item>
+                <el-dropdown-item @click="router.push('/coupon-center')">
+                  <div class="edit-profile">
+                    <el-icon><Discount /></el-icon>
+                    <span>我的优惠券</span>
+                  </div>
                 </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">
                   退出登录
@@ -98,7 +107,8 @@ import {
   Brush, 
   ShoppingCart,
   UserFilled,
-  User
+  User,
+  Discount
 } from '@element-plus/icons-vue'
 import CustomerService from '../components/CustomerService.vue'
 import request from '../utils/request'
@@ -215,93 +225,220 @@ const handleUpdateUserInfo = async () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-color);
+  background-color: var(--el-bg-color-page);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  background-color: var(--card-bg);
-  border-color: var(--border-color);
+  padding: 0 32px;
+  height: 72px;
+  background-color: var(--el-bg-color);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+
+  .logo {
+    font-size: 20px;
+    max-width: 150px;
+    flex-shrink: 0;
+  }
+
+  :deep(.nav-menu) {
+    border: none;
+    background: transparent;
+    margin: 0 48px;
+    display: flex;
+    align-items: center;
+    min-width: 300px;
+    
+    .el-menu-item {
+      font-size: 16px;
+      height: 72px;
+      line-height: 72px;
+      padding: 0 24px;
+      font-weight: 500;
+      position: relative;
+      overflow: hidden;
+      white-space: nowrap;
+      flex-shrink: 0;
+
+      &::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 3px;
+        background: linear-gradient(45deg, var(--el-color-primary), var(--el-color-success));
+        transition: width 0.3s ease;
+        border-radius: 3px;
+      }
+
+      &:hover, &.is-active {
+        color: var(--el-color-primary);
+        background: transparent;
+        
+        &::before {
+          width: 24px;
+        }
+      }
+    }
+  }
+
+  .user-actions {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    flex-shrink: 0;
+
+    .cart-link {
+      position: relative;
+      font-size: 24px;
+      color: var(--el-text-color-regular);
+      text-decoration: none;
+      transition: all 0.3s ease;
+      padding: 8px;
+      border-radius: 12px;
+
+      &:hover {
+        color: var(--el-color-primary);
+        transform: translateY(-2px);
+      }
+
+      :deep(.el-badge__content) {
+        background: linear-gradient(45deg, var(--el-color-danger), #ff9f43);
+        border: none;
+        padding: 0 6px;
+        height: 18px;
+        line-height: 18px;
+        border-radius: 9px;
+      }
+    }
+
+    .theme-dropdown {
+      .el-button {
+        padding: 8px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        border: 1px solid var(--el-border-color);
+
+        &:hover {
+          border-color: var(--el-color-primary);
+          color: var(--el-color-primary);
+          transform: translateY(-2px);
+        }
+      }
+    }
+
+    .user-dropdown {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      padding: 6px 16px;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      border: 1px solid var(--el-border-color);
+
+      &:hover {
+        border-color: var(--el-color-primary);
+        transform: translateY(-2px);
+
+        .el-avatar {
+          border-color: var(--el-color-primary);
+        }
+
+        span {
+          color: var(--el-color-primary);
+        }
+      }
+
+      .el-avatar {
+        border: 2px solid var(--el-border-color);
+        transition: all 0.3s ease;
+      }
+
+      span {
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--el-text-color-regular);
+        transition: all 0.3s ease;
+      }
+    }
+
+    .el-button {
+      padding: 10px 24px;
+      font-weight: 500;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      background: linear-gradient(45deg, var(--el-color-primary), var(--el-color-success));
+      border: none;
+      color: white;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+        opacity: 0.9;
+      }
+    }
+  }
 }
 
-.logo {
-  font-size: 20px;
-  font-weight: bold;
+:deep(.el-dropdown-menu) {
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--el-border-color-lighter);
+
+  .el-dropdown-menu__item {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    margin: 2px 0;
+
+    &:hover {
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
+      transform: translateX(4px);
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      height: 100%;
+    }
+  }
 }
 
-.user-actions {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+:deep(.el-dropdown-menu__item a) {
+  text-decoration: none !important;
+  color: inherit !important;
 }
 
-.cart-link {
-  font-size: 20px;
-  color: #333;
-  text-decoration: none;
-}
-
-.user-dropdown {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+.el-main {
+  flex: 1;
+  padding: 0;
+  background-color: var(--el-bg-color-page);
 }
 
 .footer {
   margin-top: auto;
   text-align: center;
-  background-color: var(--card-bg);
-  padding: 20px 0;
-  color: var(--text-color-secondary);
-}
-
-.theme-dropdown {
-  margin-right: 20px;
-}
-
-.el-dropdown-menu__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.user-info {
-  padding: 8px;
-  min-width: 200px;
-}
-
-.info-item {
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.info-item .label {
+  background-color: var(--el-bg-color);
+  padding: 32px 0;
   color: var(--el-text-color-secondary);
-  width: 60px;
-}
-
-.role-tag {
-  margin-right: 4px;
-}
-
-.edit-profile {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  color: var(--el-text-color-regular);
-}
-
-.edit-profile:hover {
-  color: var(--el-color-primary);
+  font-size: 14px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  letter-spacing: 0.5px;
 }
 </style> 

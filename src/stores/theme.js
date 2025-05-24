@@ -9,9 +9,15 @@ export const useThemeStore = defineStore('theme', {
 
   actions: {
     setTheme(config) {
-      this.mode = config.mode
-      this.primaryColor = config.primaryColor
-      this.menuStyle = config.menuStyle
+      if (typeof config === 'string') {
+        // 如果传入的是字符串，直接设置为模式
+        this.mode = config
+      } else if (config && typeof config === 'object') {
+        // 如果传入的是对象，设置所有配置项
+        this.mode = config.mode || this.mode
+        this.primaryColor = config.primaryColor || this.primaryColor
+        this.menuStyle = config.menuStyle || this.menuStyle
+      }
       
       // 应用主题
       this.applyTheme()

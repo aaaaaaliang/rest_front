@@ -11,6 +11,7 @@ export const API = {
     GITHUB_LOGIN: '/api/user/oauth/github/login',
     GITHUB_CALLBACK: '/api/user/oauth/callback',
     LIST: '/api/user/list',
+    EMPLOYEE_LIST: '/api/user/employee/list',
     CREATE: '/api/user',
     UPDATE: '/api/user',
     DELETE: '/api/user',
@@ -19,7 +20,7 @@ export const API = {
     RESET_PASSWORD: '/api/user/reset',
     GET_ROLE: '/api/user/role',
     ROLES: '/api/user/roles',
-    ADDUSER:"api/user/add",
+    ADDUSER:"/api/user/add",
     LOGOUT: '/api/user/logout'
   },
 
@@ -84,7 +85,8 @@ export const API = {
     GET:"ws://localhost:8888/api/ws"
   },
   PERMISSION: {
-    LIST: '/api/role/permissions'
+    LIST: '/api/permission',
+    UPDATE: '/api/permission'
   },
   IMAGE: {
     LIST: '/api/images',
@@ -94,4 +96,22 @@ export const API = {
   PAY: {
     GET: "/api/pay", // 获取支付宝支付链接
   },
+  TABLE: {
+    LIST: '/api/table',         // GET    获取餐桌列表
+    CREATE: '/api/table',       // POST   创建餐桌
+    UPDATE: '/api/table',       // PUT    更新餐桌
+    DELETE: '/api/table'        // DELETE 删除餐桌
+  },
+  COUPON: {
+    TEMPLATE_LIST: '/api/coupon/template',
+    TEMPLATE_STATUS: '/api/coupon/template/status',
+    TEMPLATE_DELETE: '/api/coupon/template',
+    TEMPLATE_CREATE: '/api/coupon/template',
+    TEMPLATE_UPDATE: '/api/coupon/template',
+    LIST_ALL: '/api/coupon/list',           // 获取所有可领取的券
+    RECEIVE: '/api/coupon/receive',          // 领取优惠券
+    SECKILL_RECEIVE: '/api/coupon/seckill/receive',  // 秒杀券领取
+    USER_COUPONS: '/api/coupon/seckill'     // 获取用户优惠券列表
+  }
 } 
+

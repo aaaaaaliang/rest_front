@@ -46,55 +46,95 @@ export const useUserStore = defineStore('user', {
         const roleRes = await request('/api/user/role')
         if (roleRes.data && roleRes.data.code === 200) {
           const { user, roles } = roleRes.data.data
-          this.user = user  // 保存用户信息
+          this.user = user
           this.roles = roles
-
-          // 2. 如果有角色，获取角色权限
-          if (roles && roles.length > 0) {
-            const roleCode = roles[0]  // 使用第一个角色
+    
+          const allPermissions = []
+    
+          // 2. 遍历每个角色获取权限
+          for (const roleCode of roles) {
             const permissionsRes = await request(`/api/role/permission?role_code=${roleCode}`)
             if (permissionsRes.data && permissionsRes.data.code === 200) {
-              this.permissions = permissionsRes.data.data
-              // 处理 CRUD 权限  筛选出具有 method 和 path 属性的权限
-              this.crudPermissions = permissionsRes.data.data.filter(p => p.method && p.path)
+              allPermissions.push(...permissionsRes.data.data)
             }
           }
+    
+          // 3. 去重合并（根据 code 去重）
+          const permissionMap = new Map()
+          allPermissions.forEach(p => {
+            if (!permissionMap.has(p.code)) {
+              permissionMap.set(p.code, p)
+            }
+          })
+
+          console.log("-----------------------------permissionMap",permissionMap)
+    
+          const mergedPermissions = Array.from(permissionMap.values())
+    
+          // 4. 保存权限
+          this.permissions = mergedPermissions
+          this.crudPermissions = mergedPermissions.filter(p => p.method && p.path)
         }
       } catch (error) {
         console.error('获取用户角色和权限失败:', error)
         throw error
       }
     },
+    
 
-    // 检查是否有 CRUD 权限
-    hasPermission(method, path) {
+    // // 检查是否有 CRUD 权限
+    // hasPermission(method, path) {
       
-      // 递归检查权限
-      const checkPermission = (items) => {
-        for (const item of items) {
-          // 如果找到匹配的权限并且是启用的
-          if (item.method === method && item.path === path && item.checked) {
-            return true
-          }
-          // 如果有子权限，递归检查
-          if (item.children && item.children.length > 0) {
-            if (checkPermission(item.children)) {
-              return true
-            }
-          }
-        }
-        return false
-      }
+    //   // 递归检查权限
+    //   const checkPermission = (items) => {
+    //     for (const item of items) {
+    //       // 如果找到匹配的权限并且是启用的
+    //       if (item.method === method && item.path === path && item.checked) {
+    //         return true
+    //       }
+    //       // 如果有子权限，递归检查
+    //       if (item.children && item.children.length > 0) {
+    //         if (checkPermission(item.children)) {
+    //           return true
+    //         }
+    //       }
+    //     }
+    //     return false
+    //   }
 
-      return checkPermission(this.permissions)
-    },
+    //   return checkPermission(this.permissions)
+    // },
+    // 检查是否有 CRUD 权限
+hasPermission(method, path) {
+  // ✅ 管理员默认拥有所有权限
+  if (this.roles.includes('admin')) return true
+
+  // 递归检查权限
+  const checkPermission = (items) => {
+    for (const item of items) {
+      if (item.method === method && item.path === path && item.checked) return true
+      if (item.children?.length > 0 && checkPermission(item.children)) return true
+    }
+    return false
+  }
+
+  return checkPermission(this.permissions)
+},
+
 
     // 检查模块是否启用
-    hasModule(moduleCode) {
-      return this.permissions?.some(
-        m => m.code === moduleCode && m.checked
-      ) || false
-    },
+    // hasModule(moduleCode) {
+    //   return this.permissions?.some(
+    //     m => m.code === moduleCode && m.checked
+    //   ) || false
+    // },
+    // 管理员默认拥有全部模块权限
+hasModule(moduleCode) {
+  return this.isAdmin || this.permissions?.some(
+    m => m.code === moduleCode && m.checked
+  ) || false
+},
+
 
     // 更新用户信息
     async updateUserInfo(userData) {

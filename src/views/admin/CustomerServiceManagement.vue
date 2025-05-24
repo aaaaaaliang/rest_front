@@ -73,9 +73,200 @@ const ws = ref(null)
 const messageBox = ref(null)
 
 // 连接WebSocket
+// const connectWebSocket = () => {
+//   try {
+//     const wsUrl = API.WS.GET;  // ✅ 直接请求后端 8888 端口
+//     console.log('正在连接 WebSocket:', wsUrl);
+
+//     ws.value = new WebSocket(wsUrl);
+
+//     ws.value.onopen = () => {
+//   console.log('✅ WebSocket 连接成功');
+//   isConnected.value = true;
+
+//   // 发送身份验证消息
+//   const authMsg = {
+//     type: 'identify',
+//     role: 'service',
+//     user_code: userStore.user?.code
+//   };
+//   console.log('📨 发送身份验证消息:', authMsg);
+//   ws.value.send(JSON.stringify(authMsg));
+// };
+
+// // ws.value.onmessage = (event) => {
+// //   console.log('📩 收到原始消息:', event.data);
+
+// //   if (!event.data) {
+// //     console.warn('⚠️ 收到空消息');
+// //     return;
+// //   }
+
+// //   try {
+// //     const data = JSON.parse(event.data);
+// //     console.log('✅ 解析后的消息:', data);
+
+// //     if (!data.type) {
+// //       console.warn('⚠️ 消息缺少 `type` 字段:', data);
+// //       return;
+// //     }
+
+// //     switch (data.type) {
+// //       case 'chat':
+// //         // 处理聊天消息
+// //         if (data.from_user !== userStore.user?.code) {
+// //           messages.value.push({
+// //             content: data.content,
+// //             timestamp: data.timestamp,
+// //             fromUser: data.from_user
+// //           });
+// //           scrollToBottom();
+// //         }
+// //         break;
+
+// //       case 'system':
+// //         // 处理系统消息，可能是在线用户数等
+// //         console.log('🔔 系统消息:', data.content);
+// //         ElMessage.info(data.content);
+// //         break;
+
+// //       case 'update_online_users':
+// //         // 更新在线用户数
+// //         console.log('⚡ 更新在线用户数:', data.onlineCount);
+// //         // 更新在线用户显示
+// //         break;
+
+// //       case 'error':
+// //         console.error('❌ 错误消息:', data.content);
+// //         ElMessage.error(data.content);
+// //         break;
+
+// //       default:
+// //         console.warn('⚠️ 未知消息类型:', data.type);
+// //     }
+// //   } catch (error) {
+// //     console.error('❌ 消息解析失败:', error);
+// //     console.error('📜 原始消息内容:', event.data);
+// //   }
+// // };
+
+// ws.value.onmessage = (event) => {
+//   console.log('📩 收到原始消息:', event.data);
+
+//   if (!event.data) {
+//     console.warn('⚠️ 收到空消息');
+//     return;
+//   }
+
+//   try {
+//     const data = JSON.parse(event.data);
+//     console.log('✅ 解析后的消息:', data);
+
+//     if (!data.type) {
+//       console.warn('⚠️ 消息缺少 `type` 字段:', data);
+//       return;
+//     }
+
+//     switch (data.type) {
+//       case 'chat':
+//         // 处理聊天消息
+//         if (data.from_user !== userStore.user?.code) {
+//           messages.value.push({
+//             content: data.content,
+//             timestamp: data.timestamp,
+//             fromUser: data.from_user
+//           });
+//           scrollToBottom();
+//         }
+//         break;
+
+//       case 'system':
+//         // 处理系统消息，可能是在线用户数等
+//         console.log('🔔 系统消息:', data.content);
+//         ElMessage.info(data.content);
+//         break;
+
+//       case 'error':
+//         console.error('❌ 错误消息:', data.content);
+//         ElMessage.error(data.content);
+//         break;
+
+//       default:
+//         console.warn('⚠️ 未知消息类型:', data.type);
+//     }
+//   } catch (error) {
+//     console.error('❌ 消息解析失败:', error);
+//     console.error('📜 原始消息内容:', event.data);
+//   }
+// };
+
+
+//     ws.value.onmessage = (event) => {
+//       console.log('📩 收到原始消息:', event.data);
+
+//       if (!event.data) {
+//         console.warn('⚠️ 收到空消息');
+//         return;
+//       }
+
+//       try {
+//         const data = JSON.parse(event.data);
+//         console.log('✅ 解析后的消息:', data);
+
+//         if (!data.type) {
+//           console.warn('⚠️ 消息缺少 `type` 字段:', data);
+//           return;
+//         }
+
+//         switch (data.type) {
+//           case 'chat':
+//             if (data.from_user !== userStore.user?.code) {
+//               messages.value.push({
+//                 content: data.content,
+//                 timestamp: data.timestamp,
+//                 fromUser: data.from_user
+//               });
+//               scrollToBottom();
+//             }
+//             break;
+
+//           case 'system':
+//             console.log('🔔 系统消息:', data.content);
+//             ElMessage.info(data.content);
+//             break;
+
+//           case 'error':
+//             console.error('❌ 错误消息:', data.content);
+//             ElMessage.error(data.content);
+//             break;
+
+//           default:
+//             console.warn('⚠️ 未知消息类型:', data.type);
+//         }
+//       } catch (error) {
+//         console.error('❌ 消息解析失败:', error);
+//         console.error('📜 原始消息内容:', event.data);
+//       }
+//     };
+
+//     ws.value.onclose = (event) => {
+//       console.log('❌ WebSocket 连接关闭:', event.code, event.reason);
+//       isConnected.value = false;
+//     };
+
+//     ws.value.onerror = (error) => {
+//       console.error('❌ WebSocket 错误:', error);
+//       isConnected.value = false;
+//     };
+//   } catch (error) {
+//     console.error('❌ WebSocket 连接失败:', error);
+//   }
+// };
+
+// 连接WebSocket并发送身份验证信息
 const connectWebSocket = () => {
   try {
-    const wsUrl = API.WS.GET;  // ✅ 直接请求后端 8888 端口
+    const wsUrl = API.WS.GET;  // 使用后端提供的 WebSocket URL
     console.log('正在连接 WebSocket:', wsUrl);
 
     ws.value = new WebSocket(wsUrl);
@@ -87,8 +278,8 @@ const connectWebSocket = () => {
       // **发送身份验证消息**
       const authMsg = {
         type: 'identify',
-        role: 'service',
-        user_code: userStore.user?.code
+        role: 'service',  // 客服角色
+        user_code: userStore.user?.code  // 确保 user_code 正确
       };
       console.log('📨 发送身份验证消息:', authMsg);
       ws.value.send(JSON.stringify(authMsg));
@@ -140,16 +331,6 @@ const connectWebSocket = () => {
         console.error('❌ 消息解析失败:', error);
         console.error('📜 原始消息内容:', event.data);
       }
-    };
-
-    ws.value.onclose = (event) => {
-      console.log('❌ WebSocket 连接关闭:', event.code, event.reason);
-      isConnected.value = false;
-    };
-
-    ws.value.onerror = (error) => {
-      console.error('❌ WebSocket 错误:', error);
-      isConnected.value = false;
     };
   } catch (error) {
     console.error('❌ WebSocket 连接失败:', error);

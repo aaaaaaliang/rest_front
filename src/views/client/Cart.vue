@@ -57,12 +57,6 @@
             </template>
           </el-table-column>
 
-
-
-
-
-
-
           <el-table-column label="小计" width="120" align="center">
             <template #default="{ row }">
               <span class="subtotal">
@@ -115,6 +109,89 @@
           去选购
         </el-button>
       </el-empty>
+
+      <!-- 结算对话框 -->
+      <el-dialog
+        v-model="checkoutDialogVisible"
+        title="确认订单信息"
+        width="500px"
+      >
+        <el-form
+          ref="checkoutFormRef"
+          :model="checkoutForm"
+          :rules="checkoutRules"
+          label-width="100px"
+        >
+          <el-form-item label="餐桌号" prop="table_no">
+            <el-select 
+              v-model="checkoutForm.table_no" 
+              placeholder="请选择餐桌"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="table in tables"
+                :key="table.code"
+                :label="`${table.location} - ${table.seats}人桌`"
+                :value="table.location"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="称呼" prop="customer">
+            <el-input 
+              v-model="checkoutForm.customer"
+              placeholder="请输入您的称呼"
+            />
+          </el-form-item>
+
+          <el-form-item label="优惠券">
+            <el-select 
+              v-model="checkoutForm.coupon_code" 
+              placeholder="请选择优惠券"
+              style="width: 100%"
+              clearable
+            >
+              <el-option
+                v-for="coupon in availableCoupons"
+                :key="coupon.code"
+                :label="`${coupon.name}（${getCouponSimpleDesc(coupon)}）`"
+                :value="coupon.code"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="备注" prop="remark">
+            <el-input 
+              v-model="checkoutForm.remark"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入订单备注（选填）"
+            />
+          </el-form-item>
+
+          <el-form-item label="订单金额">
+            <div class="price-details">
+              <div class="original-price" v-if="finalPrice < totalPrice">
+                原价：<span class="price">¥{{ totalPrice.toFixed(2) }}</span>
+              </div>
+              <div class="final-price">
+                实付：<span class="price">¥{{ finalPrice.toFixed(2) }}</span>
+              </div>
+            </div>
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="checkoutDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="submitOrder"
+            :loading="submitting"
+          >
+            提交订单
+          </el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -130,6 +207,33 @@ import { API } from '../../config/api'
 const router = useRouter()
 const items = ref([])
 const loading = ref(false)
+const submitting = ref(false)
+const checkoutDialogVisible = ref(false)
+const checkoutFormRef = ref()
+const tables = ref([])
+const availableCoupons = ref([])
+
+// 结算表单
+const checkoutForm = ref({
+  table_no: '',
+  customer: '',
+  remark: '',
+  coupon_code: ''
+})
+
+// 结算表单验证规则
+const checkoutRules = {
+  table_no: [
+    { required: true, message: '请选择餐桌', trigger: 'change' }
+  ],
+  customer: [
+    { required: true, message: '请输入称呼', trigger: 'blur' },
+    { max: 20, message: '称呼不能超过20个字符', trigger: 'blur' }
+  ],
+  remark: [
+    { max: 200, message: '备注不能超过200个字符', trigger: 'blur' }
+  ]
+}
 
 // 购物车商品列表
 const cartItems = computed(() => items.value || [])
@@ -165,7 +269,6 @@ const fetchCartList = async () => {
     loading.value = false
   }
 }
-
 
 const handleQuantityChange = async (item, value) => {
   try {
@@ -243,14 +346,167 @@ const handleClearCart = async () => {
   }
 }
 
+
+// 获取餐桌列表（支持分页）
+const fetchTables = async (index = 1, size = 10) => {
+  try {
+    const params = new URLSearchParams({
+      index: index.toString(),
+      size: size.toString()
+    })
+
+    const res = await request(`${API.TABLE.LIST}?${params.toString()}`)
+
+    if (res.data && res.data.code === 200) {
+      tables.value = res.data.data || []
+    }
+  } catch (error) {
+    ElMessage.error('获取餐桌列表失败')
+    console.error('获取餐桌列表失败:', error)
+  }
+}
+
+// 获取用户优惠券列表
+const fetchUserCoupons = async () => {
+  try {
+    const res = await request(API.COUPON.USER_COUPONS)
+    if (res.data && res.data.code === 200) {
+      // 只显示未使用且未过期的优惠券
+      availableCoupons.value = (res.data.data || []).filter(coupon => {
+        const now = Date.now() / 1000
+        return coupon.status === 0 && coupon.expire_time > now
+      })
+      console.log('可用优惠券:', availableCoupons.value)
+    }
+  } catch (error) {
+    console.error('获取优惠券列表失败:', error)
+    ElMessage.error('获取优惠券列表失败')
+  }
+}
+
+// 简化优惠券描述
+const getCouponSimpleDesc = (coupon) => {
+  if (!coupon) return ''
+  switch (coupon.type) {
+    case 'full':
+      return `满${coupon.min_amount}减${coupon.quota}元`
+    case 'discount':
+      return `满${coupon.min_amount}享${coupon.quota * 10}折`
+    case 'cash':
+      return `无门槛减${coupon.quota}元`
+    default:
+      return ''
+  }
+}
+
+// 计算优惠后的价格
+const finalPrice = computed(() => {
+  if (!checkoutForm.value.coupon_code) {
+    return totalPrice.value
+  }
+  
+  const selectedCoupon = availableCoupons.value.find(
+    c => c.code === checkoutForm.value.coupon_code
+  )
+  
+  if (!selectedCoupon) {
+    return totalPrice.value
+  }
+  
+  // 如果订单金额小于最低使用金额，不应用优惠
+  if (totalPrice.value < selectedCoupon.min_amount) {
+    return totalPrice.value
+  }
+  
+  // 根据优惠券类型计算实际优惠金额
+  let discount = 0
+  switch (selectedCoupon.type) {
+    case 'full':
+    case 'cash':
+      discount = Math.min(selectedCoupon.quota, totalPrice.value)
+      break
+    case 'discount':
+      discount = totalPrice.value * (1 - selectedCoupon.quota)
+      break
+  }
+  
+  return Math.max(0, totalPrice.value - discount)
+})
+
 // 去结算
-const handleCheckout = () => {
-  router.push('/checkout')
+const handleCheckout = async () => {
+  checkoutForm.value = {
+    table_no: '',
+    customer: '',
+    remark: '',
+    coupon_code: ''
+  }
+  checkoutDialogVisible.value = true
+  await fetchUserCoupons() // 获取可用优惠券
+}
+
+// 提交订单
+const submitOrder = async () => {
+  if (!checkoutFormRef.value) return
+  
+  await checkoutFormRef.value.validate(async (valid) => {
+    if (valid) {
+      submitting.value = true
+      try {
+        const orderData = {
+          table_no: checkoutForm.value.table_no,
+          customer: checkoutForm.value.customer,
+          total_price: totalPrice.value,
+          details: cartItems.value.map(item => ({
+            product_code: item.product_code,
+            product_name: item.product_name,
+            quantity: item.select_num,
+            price: item.product_price,
+            picture: item.picture?.code
+          })),
+          remark: checkoutForm.value.remark,
+          coupon_code: checkoutForm.value.coupon_code,
+          client_payable_amount: finalPrice.value // 添加前端计算的最终支付金额
+        }
+
+        const res = await request(API.ORDER.ADD, {
+          method: 'POST',
+          data: orderData
+        })
+
+        if (res.data && res.data.code === 200) {
+          ElMessage.success('下单成功')
+          checkoutDialogVisible.value = false
+          items.value = []
+          
+          let countdown = 1
+          const timer = setInterval(() => {
+            if (countdown > 0) {
+              ElMessage({
+                message: `${countdown}秒后跳转到订单页面...`,
+                type: 'info',
+                duration: 1000
+              })
+              countdown--
+            } else {
+              clearInterval(timer)
+              router.push('/orders')
+            }
+          }, 1000)
+        }
+      } catch (error) {
+        ElMessage.error(error.message || '下单失败')
+      } finally {
+        submitting.value = false
+      }
+    }
+  })
 }
 
 // 初始化
 onMounted(() => {
   fetchCartList()
+  fetchTables()
 })
 </script>
 
@@ -258,22 +514,27 @@ onMounted(() => {
 .cart-page {
   padding: 20px;
   min-height: calc(100vh - 60px);
-  background: #f5f5f5;
+  background: var(--el-bg-color-page);
 }
 
 .cart-content {
   max-width: 1200px;
   margin: 0 auto;
+  border-radius: 12px;
+  box-shadow: var(--el-box-shadow-light);
 
   .cart-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
 
     h3 {
       margin: 0;
       font-size: 18px;
       font-weight: 600;
+      color: var(--el-text-color-primary);
     }
   }
 }
@@ -281,45 +542,77 @@ onMounted(() => {
 .product-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 
   .product-image {
-    width: 60px;
-    height: 60px;
-    border-radius: 4px;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease;
+
+    &:hover {
+      transform: scale(1.05);
+    }
   }
 
   .product-name {
-    font-size: 14px;
+    font-size: 15px;
+    color: var(--el-text-color-primary);
+    font-weight: 500;
   }
 }
 
 .price, .subtotal {
   color: var(--el-color-danger);
   font-weight: 600;
+  font-size: 16px;
 }
 
 .cart-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 20px;
+  margin-top: 24px;
   padding: 20px;
-  background: var(--el-fill-color-light);
-  border-radius: 4px;
+  background: var(--el-bg-color-overlay);
+  border-radius: 12px;
+  box-shadow: var(--el-box-shadow-light);
+
+  .footer-left {
+    .total-count {
+      font-size: 14px;
+      color: var(--el-text-color-regular);
+    }
+  }
 
   .footer-right {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 24px;
 
     .total-price {
-      font-size: 14px;
+      font-size: 15px;
+      color: var(--el-text-color-regular);
       
       .price {
-        font-size: 20px;
+        font-size: 24px;
         margin-left: 8px;
+        color: var(--el-color-danger);
+        font-weight: 600;
+      }
+    }
+
+    .el-button {
+      padding: 12px 32px;
+      font-size: 16px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
       }
     }
   }
@@ -333,5 +626,177 @@ onMounted(() => {
   justify-content: center;
   background: var(--el-fill-color-light);
   color: var(--el-text-color-secondary);
+  font-size: 24px;
+}
+
+/* 结算对话框样式 */
+.order-total {
+  font-size: 24px;
+  color: var(--el-color-danger);
+  font-weight: 600;
+  text-align: right;
+  margin-top: 16px;
+}
+
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+
+  .el-dialog__header {
+    margin: 0;
+    padding: 20px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    background: var(--el-bg-color-overlay);
+  }
+
+  .el-dialog__body {
+    padding: 24px;
+  }
+
+  .el-dialog__footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    background: var(--el-bg-color-overlay);
+  }
+}
+
+:deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+:deep(.el-input-number) {
+  .el-input__wrapper {
+    box-shadow: none;
+    border: 1px solid var(--el-border-color);
+    border-radius: 6px;
+    
+    &:hover {
+      border-color: var(--el-color-primary);
+    }
+    
+    &.is-focus {
+      border-color: var(--el-color-primary);
+      box-shadow: 0 0 0 1px var(--el-color-primary-light-5);
+    }
+  }
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  
+  th {
+    background: var(--el-bg-color-overlay);
+    font-weight: 600;
+  }
+  
+  td {
+    padding: 16px 0;
+  }
+}
+
+:deep(.el-button--link) {
+  font-weight: 500;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.coupon-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 0;
+  
+  .coupon-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    
+    .coupon-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      
+      .coupon-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+      }
+      
+      .coupon-type {
+        font-size: 12px;
+        color: var(--el-color-primary);
+        background: var(--el-color-primary-light-9);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    }
+    
+    .coupon-desc {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      
+      .discount-info {
+        font-size: 13px;
+        color: var(--el-color-danger);
+        font-weight: 500;
+      }
+      
+      .expire-info {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+      }
+    }
+  }
+  
+  .coupon-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    
+    .min-amount {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+    
+    .discount-amount {
+      font-size: 16px;
+      color: var(--el-color-danger);
+      font-weight: 600;
+    }
+  }
+}
+
+:deep(.el-select-dropdown__item) {
+  padding: 0 12px;
+  
+  &.selected {
+    .coupon-option {
+      background: var(--el-color-primary-light-9);
+    }
+  }
+}
+
+.price-details {
+  text-align: right;
+  
+  .original-price {
+    font-size: 14px;
+    color: var(--el-text-color-secondary);
+    text-decoration: line-through;
+    margin-bottom: 4px;
+  }
+  
+  .final-price {
+    font-size: 24px;
+    color: var(--el-color-danger);
+    font-weight: 600;
+  }
 }
 </style> 

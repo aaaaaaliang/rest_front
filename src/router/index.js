@@ -30,10 +30,11 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('../views/admin/Dashboard.vue'),
-        meta: { 
-          requiresAuth: true,
-          permission: { method: 'GET', path: '/api/dashboard' }
-        }
+        // meta: { 
+        //   requiresAuth: true,
+        //   permission: { method: 'GET', path: '/api/dashboard' }
+        // }
+        meta: { requiresAuth: true }
       },
       {
         path: 'user',
@@ -96,6 +97,32 @@ const routes = [
           requiresAdmin: true,
           title: '轮播图管理'
         }
+      },
+      {
+        path: 'tables',
+        name: 'TableManagement',
+        component: () => import('../views/admin/TableManagement.vue'),
+        meta: { 
+          requiresAuth: true,
+          requiresAdmin: true,
+          title: '餐桌管理'
+        }
+      },
+      {
+        path: 'permissions',
+        name: 'PermissionManagement',
+        component: () => import('../views/admin/PermissionManagement.vue'),
+        meta: { 
+          requiresAuth: true,
+          requiresAdmin: true,
+          title: '权限管理'
+        }
+      },
+      {
+        path: 'coupons',
+        name: 'CouponManagement',
+        component: () => import('../views/admin/CouponManagement.vue'),
+        meta: { title: '优惠券管理' }
       }
     ]
   },
@@ -137,6 +164,15 @@ const routes = [
         meta: {
           requiresAuth: true,
           layout: 'client'
+        }
+      },
+      {
+        path: 'coupon-center',
+        name: 'CouponCenter',
+        component: () => import('../views/client/CouponCenter.vue'),
+        meta: {
+          title: '领券中心',
+          requiresAuth: true
         }
       }
     ]

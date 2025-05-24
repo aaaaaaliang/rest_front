@@ -60,14 +60,14 @@
 
         <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button 
-              type="primary" 
+            <el-button
               link
               @click="handleEdit(row)"
               v-if="hasPermission('api_product_put')"
             >
               编辑
             </el-button>
+
             <el-popconfirm
               title="确定删除此菜品吗？"
               @confirm="handleDelete(row.code)"
@@ -280,6 +280,7 @@ const fetchList = async () => {
     
     const res = await request(`${API.PRODUCT.LIST}?${params}`)
     if (res.data && res.data.code === 200) {
+      console.log("res-data:",res.data)
       tableData.value = res.data.data || []  // 使用 res.data.data 作为表格数据
       total.value = res.data.total || 0      // 从响应中获取总数
     }
@@ -339,6 +340,8 @@ const handleUploadSuccess = (res) => {
     ElMessage.error(res.message || '上传失败')
   }
 }
+
+
 
 // 修改表单初始化
 const initForm = () => ({
@@ -457,34 +460,219 @@ onMounted(() => {
 
 <style scoped>
 .dish-management {
-  padding: 20px;
+  padding: 24px;
+  min-height: calc(100vh - 60px);
+  background-color: var(--bg-color);
 }
 
+/* 卡片样式 */
+:deep(.el-card) {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+:deep(.el-card:hover) {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* 卡片头部 */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 16px 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
-:deep(.el-table__row) {
-  .cell {
-    .el-button {
-      padding: 4px 8px;
-    }
-  }
+.header-left span {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* 分类选择器 */
+:deep(.el-select) {
+  width: 200px;
+}
+
+:deep(.el-select .el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--border-color);
+  transition: all 0.3s ease;
+}
+
+:deep(.el-select .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+
+/* 表格样式 */
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+:deep(.el-table th) {
+  background-color: var(--bg-color) !important;
+  font-weight: 600;
+  color: var(--text-color);
+  padding: 12px 0;
+}
+
+:deep(.el-table td) {
+  padding: 16px 0;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: var(--hover-bg) !important;
+}
+
+/* 图片预览 */
+:deep(.el-image) {
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+:deep(.el-image:hover) {
+  transform: scale(1.05);
+}
+
+/* 按钮样式 */
+:deep(.el-button) {
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary) {
+  background: var(--el-color-primary);
+  border: none;
+}
+
+:deep(.el-button--primary:hover) {
+  background: var(--el-color-primary-dark-2);
+  transform: translateY(-1px);
+}
+
+:deep(.el-button--text) {
+  padding: 4px 8px;
+}
+
+:deep(.el-button--text:hover) {
+  background: var(--hover-bg);
+  border-radius: 4px;
+}
+
+/* 分页容器 */
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 0;
+}
+
+/* 对话框样式 */
+:deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+:deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color);
 }
 
 :deep(.el-dialog__body) {
-  padding-top: 20px;
+  padding: 24px;
 }
 
-:deep(.el-select) {
-  width: 100%;
+:deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 表单样式 */
+:deep(.el-form-item__label) {
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--border-color);
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover),
+:deep(.el-textarea__inner:hover) {
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+
+/* 上传组件样式 */
+:deep(.upload-component) {
+  .el-upload {
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .el-upload:hover {
+    border-color: var(--el-color-primary);
+  }
+
+  .preview-image {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+}
+
+/* 开关样式 */
+:deep(.el-switch) {
+  --el-switch-on-color: var(--el-color-primary);
+}
+
+/* 响应式布局 */
+@media screen and (max-width: 768px) {
+  .dish-management {
+    padding: 16px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  :deep(.el-select) {
+    width: 100%;
+  }
 }
 </style> 

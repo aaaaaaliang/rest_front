@@ -58,6 +58,11 @@
           <div class="dish-info">
             <h3 class="dish-name">{{ dish.products_name }}</h3>
             <p class="dish-desc">{{ dish.describe || '暂无描述' }}</p>
+            <div class="stock-info" :class="{ 'low': dish.count <= 10 && dish.count > 0, 'empty': dish.count <= 0 }">
+              <el-icon><Goods /></el-icon>
+              <span v-if="dish.count > 0">库存: {{ dish.count }}份</span>
+              <span v-else>已售罄</span>
+            </div>
             <div class="dish-footer">
               <span class="price">¥{{ (dish.price ?? 0).toFixed(2) }}</span>
               <div class="actions">
@@ -211,7 +216,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '../../stores/cart'
 import { ElMessage } from 'element-plus'
-import { Picture, Menu, ForkSpoon } from '@element-plus/icons-vue'
+import { Picture, Menu, ForkSpoon, Goods } from '@element-plus/icons-vue'
 import { useCategoryStore } from '../../stores/category'
 import request from '../../utils/request'
 import { API } from '../../config/api'
@@ -367,75 +372,71 @@ onMounted(async () => {
 .menu-page {
   display: flex;
   min-height: calc(100vh - 60px);
-  background: #f5f5f5;
+  background: var(--el-bg-color-page);
   padding: 20px;
-  gap: 20px;
+  gap: 24px;
 }
 
 .category-nav {
-  width: 220px;
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px 0;
+  width: 240px;
+  background: var(--el-bg-color);
+  border-radius: 16px;
+  padding: 20px 0;
   height: fit-content;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--el-box-shadow-light);
   position: sticky;
   top: 20px;
 
   .category-item {
     padding: 16px 24px;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.3s ease;
     font-size: 15px;
     display: flex;
     align-items: center;
     gap: 12px;
     position: relative;
+    margin: 4px 0;
+    border-left: 3px solid transparent;
 
     .el-icon {
-      font-size: 18px;
+      font-size: 20px;
       color: var(--el-text-color-secondary);
-      transition: all 0.3s;
+      transition: all 0.3s ease;
     }
 
     &:hover {
       color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
+      border-left-color: var(--el-color-primary);
+      background: transparent;
 
       .el-icon {
         color: var(--el-color-primary);
+        transform: scale(1.1);
       }
     }
 
     &.active {
       color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
-      font-weight: 500;
+      border-left-color: var(--el-color-primary);
+      font-weight: 600;
+      background: transparent;
 
       .el-icon {
         color: var(--el-color-primary);
-      }
-
-      &::after {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 4px;
-        height: 24px;
-        background: var(--el-color-primary);
-        border-radius: 0 4px 4px 0;
+        transform: scale(1.1);
       }
     }
 
     .sub-category {
-      padding: 12px 0 12px 30px;
+      padding: 12px 0 12px 36px;
       margin-top: 4px;
       font-size: 14px;
       color: var(--el-text-color-regular);
       display: flex;
       align-items: center;
+      transition: all 0.3s ease;
+      border-left: 2px solid transparent;
 
       &::before {
         content: '';
@@ -445,15 +446,32 @@ onMounted(async () => {
         border-radius: 50%;
         margin-right: 8px;
         opacity: 0.5;
+        transition: all 0.3s ease;
       }
 
       &:hover {
         color: var(--el-color-primary);
+        border-left-color: var(--el-color-primary);
+        background: transparent;
+
+        &::before {
+          background: var(--el-color-primary);
+          opacity: 1;
+          transform: scale(1.2);
+        }
       }
 
       &.active {
         color: var(--el-color-primary);
         font-weight: 500;
+        border-left-color: var(--el-color-primary);
+        background: transparent;
+
+        &::before {
+          background: var(--el-color-primary);
+          opacity: 1;
+          transform: scale(1.2);
+        }
       }
     }
   }
@@ -461,60 +479,116 @@ onMounted(async () => {
 
 .dish-content {
   flex: 1;
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
+  background: var(--el-bg-color);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--el-box-shadow-light);
 
   .dish-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
   }
 }
 
 .dish-card {
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  border: 1px solid var(--el-border-color-lighter);
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--el-box-shadow-light);
+  }
 
   .dish-image {
-    height: 160px;
+    height: 180px;
     overflow: hidden;
 
     .el-image {
       width: 100%;
       height: 100%;
+      transition: transform 0.3s ease;
+
+      &:hover {
+        transform: scale(1.05);
+      }
     }
   }
 
   .dish-info {
-    padding: 12px;
+    padding: 16px;
 
     .dish-name {
       margin: 0;
-      font-size: 15px;
-      font-weight: 500;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
     }
 
     .dish-desc {
       margin: 8px 0;
+      font-size: 14px;
+      color: var(--el-text-color-secondary);
+      line-height: 1.5;
+      height: 42px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .stock-info {
+      margin: 8px 0;
       font-size: 13px;
       color: var(--el-text-color-secondary);
-      line-height: 1.4;
-      height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      .el-icon {
+        font-size: 14px;
+      }
+
+      &.low {
+        color: var(--el-color-warning);
+      }
+
+      &.empty {
+        color: var(--el-color-danger);
+      }
     }
 
     .dish-footer {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 8px;
+      margin-top: 12px;
 
       .price {
-        font-size: 16px;
+        font-size: 18px;
         font-weight: 600;
         color: var(--el-color-danger);
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .el-button {
+        padding: 8px 16px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+        }
       }
     }
   }
@@ -523,7 +597,9 @@ onMounted(async () => {
 .pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 20px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
 .cart-content {

@@ -14,7 +14,13 @@ onMounted(() => {
   // 初始化主题
   const savedTheme = localStorage.getItem('theme')
   if (savedTheme) {
-    themeStore.setTheme(JSON.parse(savedTheme))
+    try {
+      const themeConfig = JSON.parse(savedTheme)
+      themeStore.setTheme(themeConfig)
+    } catch (error) {
+      console.error('解析主题配置失败:', error)
+      themeStore.applyTheme()
+    }
   } else {
     themeStore.applyTheme()
   }

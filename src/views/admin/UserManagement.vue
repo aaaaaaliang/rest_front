@@ -7,9 +7,9 @@
             <span>用户管理</span>
           </div>
           <div class="header-right">
-            <el-button 
+            <el-button
               v-if="hasPermission('api_user_post')"
-              type="primary" 
+              type="primary"
               @click="handleAdd"
             >
               新增用户
@@ -17,6 +17,12 @@
           </div>
         </div>
       </template>
+
+      <!-- 用户类型标签页 -->
+      <el-tabs v-model="activeTab" @tab-click="handleTabChange">
+        <el-tab-pane label="普通用户" name="normal"></el-tab-pane>
+        <el-tab-pane label="员工用户" name="employee"></el-tab-pane>
+      </el-tabs>
 
       <!-- 搜索栏 -->
       <div class="search-bar">
@@ -59,7 +65,7 @@
         </el-table-column>
         <el-table-column label="操作" width="320">
           <template #default="scope">
-            <el-button 
+            <el-button
               v-if="hasPermission('api_user_put')"
               size="small"
               type="warning"
@@ -114,43 +120,44 @@
         ref="userFormRef"
         :model="userForm"
         :rules="rules"
-        label-width="80px"
+        label-width="100px"
       >
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="userForm.username" />
+          <el-input v-model="userForm.username" placeholder="请输入用户名" />
         </el-form-item>
         <el-form-item label="邮箱" prop="email">
-          <el-input v-model="userForm.email" />
+          <el-input v-model="userForm.email" placeholder="请输入邮箱" />
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
-          <el-input v-model="userForm.phone" />
+          <el-input v-model="userForm.phone" placeholder="请输入手机号" />
         </el-form-item>
         <el-form-item label="密码" prop="password" v-if="dialogType === 'add'">
-          <el-input v-model="userForm.password" type="password" show-password />
+          <el-input v-model="userForm.password" type="password" show-password placeholder="请输入密码" />
         </el-form-item>
-<!--        <el-form-item label="是否为员工" label-width="120px">-->
-<!--        <el-switch v-model="userForm.is_employee" />-->
-<!--        </el-form-item>-->
-
-<!--        <el-form-item label="基础工资" v-if="userForm.is_employee">-->
-<!--          <el-input v-model="userForm.base_salary" type="number" placeholder="请输入基础工资" />-->
-<!--        </el-form-item>-->
-<!--        <el-form-item label="真实姓名" v-if="userForm.is_employee">-->
-<!--          <el-input v-model="userForm.real_name"placeholder="请输入真实名字" />-->
-<!--        </el-form-item>-->
-
-        <el-form-item label="是否为员工" label-width="120px">
-          <el-switch v-model="userForm.is_employee" />
+        
+        <el-form-item label="用户类型" prop="is_employee">
+          <el-switch
+            v-model="userForm.is_employee"
+            active-text="员工"
+            inactive-text="普通用户"
+            @change="handleUserTypeChange"
+          />
         </el-form-item>
 
-        <el-form-item label="基础工资" v-if="userForm.is_employee">
-          <el-input v-model="userForm.base_salary" type="number" placeholder="请输入基础工资" />
-        </el-form-item>
-        <el-form-item label="真实姓名" v-if="userForm.is_employee">
-          <el-input v-model="userForm.real_name" placeholder="请输入真实名字" />
-        </el-form-item>
-
-
+        <template v-if="userForm.is_employee">
+          <el-form-item label="真实姓名" prop="real_name">
+            <el-input v-model="userForm.real_name" placeholder="请输入真实姓名" />
+          </el-form-item>
+          <el-form-item label="基础工资" prop="base_salary">
+            <el-input-number 
+              v-model="userForm.base_salary" 
+              :min="0"
+              :precision="2"
+              :step="1000"
+              placeholder="请输入基础工资"
+            />
+          </el-form-item>
+        </template>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -211,6 +218,7 @@ const users = ref([])
 const roles = ref([])
 const selectedRoles = ref([])
 const currentUser = ref(null)
+const activeTab = ref('normal')
 
 // 分页参数
 const page = reactive({
@@ -225,7 +233,6 @@ const searchForm = reactive({
 })
 
 // 用户表单
-
 const userForm = ref({
   username: '',
   email: '',
@@ -239,41 +246,58 @@ const userForm = ref({
 // 表单验证规则
 const rules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
   ],
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
   ],
   phone: [
-    { required: true, message: '请输入手机号', trigger: 'blur' }
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
+  ],
+  real_name: [
+    { required: true, message: '请输入真实姓名', trigger: 'blur' }
+  ],
+  base_salary: [
+    { required: true, message: '请输入基础工资', trigger: 'blur' }
   ]
+}
+
+// 处理标签页切换
+const handleTabChange = () => {
+  page.index = 1
+  fetchUsers()
 }
 
 // 获取用户列表
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const res = await request(API.USER.LIST + `?index=${page.index}&size=${page.size}&username=${searchForm.username}`)
+    let url = API.USER.LIST
+    if (activeTab.value === 'employee') {
+      url = API.USER.EMPLOYEE_LIST
+    } else if (activeTab.value === 'normal') {
+      url = API.USER.LIST
+    }
+    
+    const res = await request(`${url}?index=${page.index}&size=${page.size}&username=${searchForm.username}`)
     if (res.data && res.data.code === 200) {
-      users.value = res.data.data  // 使用 res.data.data 作为用户列表数据
-      page.total = res.data.total  // 从响应中获取总数
+      users.value = res.data.data
+      page.total = res.data.total
     }
   } catch (error) {
+    console.error('获取用户列表失败:', error)
     ElMessage.error(error.message || '获取用户列表失败')
   } finally {
     loading.value = false
   }
 }
-const convertBaseSalary = () => {
-  if (userForm.value.base_salary) {
-    userForm.value.base_salary = parseFloat(userForm.value.base_salary);
-  }
-};
-
 
 // 获取角色列表
 const fetchRoles = async () => {
@@ -328,17 +352,10 @@ const handleAdd = () => {
     phone: '',
     password: '',
     is_employee: false, // 是否为员工
-  base_salary: null   // 基础工资
+    base_salary: null   // 基础工资
   }
   dialogVisible.value = true
 }
-
-// 编辑用户
-// const handleEdit = (row) => {
-//   dialogType.value = 'edit'
-//   userForm.value = { ...row }
-//   dialogVisible.value = true
-// }
 
 // 编辑用户
 const handleEdit = (row) => {
@@ -356,27 +373,6 @@ const handleEdit = (row) => {
 
   dialogVisible.value = true
 }
-
-
-
-
-// 删除用户
-// const handleDelete = async (row) => {
-//   try {
-//     await ElMessageBox.confirm('确定要删除该用户吗？', '提示', {
-//       type: 'warning'
-//     })
-//     await request(API.USER.DELETE + `/${row.id}`, {
-//       method: 'DELETE'
-//     })
-//     ElMessage.success('删除成功')
-//     fetchUsers()
-//   } catch (error) {
-//     if (error !== 'cancel') {
-//       ElMessage.error('删除失败')
-//     }
-//   }
-// }
 
 // 删除用户
 const handleDelete = async (row) => {
@@ -400,103 +396,7 @@ const handleDelete = async (row) => {
   }
 }
 
-
-
 // 提交表单
-// const handleSubmit = async () => {
-//   try {
-//
-//     if (userForm.value.is_employee && userForm.value.base_salary) {
-//       userForm.value.base_salary = parseFloat(userForm.value.base_salary)
-//       ElMessage.error('基础工资必须是数字');
-//     }
-//
-//     if (dialogType.value === 'add') {
-//       await request(API.USER.ADDUSER, {
-//         method: 'POST',
-//         data: userForm.value
-//       })
-//       ElMessage.success('新增成功')
-//     } else {
-//       await request(API.USER.UPDATE, {
-//         method: 'PUT',
-//         data: userForm.value
-//       })
-//       ElMessage.success('编辑成功')
-//     }
-//
-//     dialogVisible.value = false
-//     fetchUsers()
-//   } catch (error) {
-//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败')
-//   }
-// }
-// 提交表单
-// const handleSubmit = async () => {
-//   try {
-//     // 如果是员工并且基础工资字段存在，确保它是数字类型
-//     if (userForm.value.is_employee && userForm.value.base_salary) {
-//       userForm.value.base_salary = parseFloat(userForm.value.base_salary);
-//     }
-//
-//     // 检查基础工资是否为有效的数字
-//     if (userForm.value.is_employee && isNaN(userForm.value.base_salary)) {
-//       ElMessage.error('基础工资必须是有效的数字');
-//       return;
-//     }
-//
-//     // 根据对话框类型判断新增或编辑
-//     if (dialogType.value === 'add') {
-//       await request(API.USER.ADDUSER, {
-//         method: 'POST',
-//         data: userForm.value
-//       });
-//       ElMessage.success('新增成功');
-//     } else {
-//       await request(API.USER.UPDATE, {
-//         method: 'PUT',
-//         data: userForm.value
-//       });
-//       ElMessage.success('编辑成功');
-//     }
-//
-//     dialogVisible.value = false;
-//     fetchUsers();  // 刷新用户列表
-//   } catch (error) {
-//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败');
-//   }
-// }
-// const handleSubmit = async () => {
-//   try {
-//     // 检查是否是员工并确保 base_salary 为数字类型
-//     if (userForm.value.is_employee) {
-//       // 如果没有基础工资，设置为0
-//       userForm.value.base_salary = parseFloat(userForm.value.base_salary) || 0; // 防止传递空字符串或非数字
-//     } else {
-//       userForm.value.base_salary = 0; // 如果不是员工，直接设置为0
-//     }
-
-//     if (dialogType.value === 'add') {
-//       await request(API.USER.ADDUSER, {
-//         method: 'POST',
-//         data: userForm.value
-//       });
-//       ElMessage.success('新增成功');
-//     } else {
-//       await request(API.USER.UPDATE, {
-//         method: 'PUT',
-//         data: userForm.value
-//       });
-//       ElMessage.success('编辑成功');
-//     }
-
-//     dialogVisible.value = false;
-//     fetchUsers();
-//   } catch (error) {
-//     ElMessage.error(dialogType.value === 'add' ? '新增失败' : '编辑失败');
-//   }
-// }
-
 const handleSubmit = async () => {
   try {
     // 检查是否是员工并确保 base_salary 为数字类型
@@ -528,7 +428,6 @@ const handleSubmit = async () => {
   }
 }
 
-
 // 分配角色
 const handleAssignRole = async (row) => {
   const userCode = row.user_code || row.code
@@ -549,7 +448,7 @@ const handleAssignRole = async (row) => {
 
       // 设置已选中的角色
       selectedRoles.value = row.roles ? row.roles.map(role => role.code) : []
-      
+
       // 打开对话框
       roleDialogVisible.value = true
     }
@@ -589,6 +488,14 @@ const handleSubmitRoles = async () => {
   }
 }
 
+// 处理用户类型变化
+const handleUserTypeChange = (val) => {
+  if (!val) {
+    userForm.value.base_salary = 0
+    userForm.value.real_name = ''
+  }
+}
+
 // 初始化
 onMounted(() => {
   fetchUsers()
@@ -599,79 +506,157 @@ onMounted(() => {
 <style scoped>
 .user-management {
   padding: 20px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
 }
 
-/* 调试面板样式 */
-.debug-panel {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-}
-
-.debug-item {
-  margin: 10px 0;
-  padding: 10px;
-  background: #f5f7fa;
-  border-radius: 4px;
-}
-
-.debug-json {
-  background: #f5f7fa;
-  padding: 10px;
-  border-radius: 4px;
-  font-family: monospace;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-size: 12px;
-}
-
-h4 {
-  margin: 20px 0 10px;
-  color: #606266;
-}
-
-/* 确保按钮可见性 */
-.el-button {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 修复按钮间距 */
-.el-button + .el-button {
-  margin-left: 10px;
-}
-
-/* 确保操作列宽度足够 */
-:deep(.el-table__row) {
-  .cell {
-    white-space: nowrap;
-  }
+.el-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 15px 0;
+}
+
+.header-left {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .search-bar {
-  margin-bottom: 20px;
+  margin: 20px 0;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.el-table {
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table__header) {
+  background-color: #f5f7fa;
+}
+
+:deep(.el-table__row) {
+  transition: all 0.3s;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+.role-tag {
+  margin: 2px;
+  border-radius: 4px;
 }
 
 .pagination {
   margin-top: 20px;
-  text-align: right;
-}
-
-.el-checkbox-group {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: flex-end;
+  padding: 10px 0;
 }
 
-.role-tag {
-  margin-right: 5px;
-  margin-bottom: 5px;
+.el-dialog {
+  border-radius: 8px;
+}
+
+:deep(.el-dialog__header) {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+:deep(.el-dialog__body) {
+  padding: 30px 20px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.el-form-item {
+  margin-bottom: 22px;
+}
+
+:deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+
+/* 操作按钮样式优化 */
+:deep(.el-button--text) {
+  padding: 4px 8px;
+  font-size: 14px;
+  height: auto;
+  line-height: 1.5;
+}
+
+:deep(.el-button--text.el-button--warning) {
+  color: #e6a23c;
+}
+
+:deep(.el-button--text.el-button--warning:hover) {
+  color: #ebb563;
+  background-color: rgba(230, 162, 60, 0.1);
+}
+
+:deep(.el-button--text.el-button--danger) {
+  color: #f56c6c;
+}
+
+:deep(.el-button--text.el-button--danger:hover) {
+  color: #f78989;
+  background-color: rgba(245, 108, 108, 0.1);
+}
+
+:deep(.el-button--text.el-button--primary) {
+  color: #409eff;
+}
+
+:deep(.el-button--text.el-button--primary:hover) {
+  color: #66b1ff;
+  background-color: rgba(64, 158, 255, 0.1);
+}
+
+/* 表格内容样式优化 */
+:deep(.el-table .cell) {
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+:deep(.el-table td) {
+  padding: 12px 0;
+}
+
+/* 标签页样式优化 */
+:deep(.el-tabs__item) {
+  font-size: 15px;
+  height: 40px;
+  line-height: 40px;
+}
+
+:deep(.el-tabs__item.is-active) {
+  font-weight: 600;
+}
+
+:deep(.el-tabs__active-bar) {
+  height: 3px;
+  border-radius: 3px;
 }
 </style>

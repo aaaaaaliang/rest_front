@@ -286,7 +286,7 @@ const handleDelete = async (row) => {
       ElMessage.success('删除成功')
       fetchRoles()
     } else {
-      throw new Error(res.data?.message || '删除失败')
+      throw new Error(res.data?.error || res.data?.message || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -448,22 +448,162 @@ async function login() {
 <style scoped>
 .role-management {
   padding: 20px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+
+.el-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 15px 0;
+}
+
+.card-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 表格样式优化 */
+:deep(.el-table) {
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table__header) {
+  background-color: #f5f7fa;
+}
+
+:deep(.el-table__row) {
+  transition: all 0.3s;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+/* 操作按钮样式优化 */
+:deep(.el-button--text) {
+  padding: 4px 8px;
+  font-size: 14px;
+  height: auto;
+  line-height: 1.5;
+}
+
+:deep(.el-button--text.el-button--warning) {
+  color: #e6a23c;
+}
+
+:deep(.el-button--text.el-button--warning:hover) {
+  color: #ebb563;
+  background-color: rgba(230, 162, 60, 0.1);
+}
+
+:deep(.el-button--text.el-button--danger) {
+  color: #f56c6c;
+}
+
+:deep(.el-button--text.el-button--danger:hover) {
+  color: #f78989;
+  background-color: rgba(245, 108, 108, 0.1);
+}
+
+:deep(.el-button--text.el-button--primary) {
+  color: #409eff;
+}
+
+:deep(.el-button--text.el-button--primary:hover) {
+  color: #66b1ff;
+  background-color: rgba(64, 158, 255, 0.1);
+}
+
+/* 对话框样式优化 */
+:deep(.el-dialog) {
+  border-radius: 8px;
+}
+
+:deep(.el-dialog__header) {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+  margin: 0;
+}
+
+:deep(.el-dialog__body) {
+  padding: 30px 20px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 20px;
+  border-top: 1px solid #ebeef5;
+  margin: 0;
+}
+
+/* 表单样式优化 */
+:deep(.el-form-item) {
+  margin-bottom: 22px;
+}
+
+:deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+
+/* 树形控件样式优化 */
+:deep(.el-tree) {
+  background: transparent;
+}
+
+:deep(.el-tree-node__content) {
+  height: 40px;
+}
+
+:deep(.el-tree-node__content:hover) {
+  background-color: #f5f7fa;
+}
+
+:deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background-color: #ecf5ff;
 }
 
 .custom-tree-node {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .description {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+  margin-left: 8px;
+}
+
+/* 复选框样式优化 */
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #409eff;
+  border-color: #409eff;
+}
+
+:deep(.el-checkbox__input.is-indeterminate .el-checkbox__inner) {
+  background-color: #409eff;
+  border-color: #409eff;
+}
+
+:deep(.el-checkbox__inner:hover) {
+  border-color: #409eff;
 }
 </style>

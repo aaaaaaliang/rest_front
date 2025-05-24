@@ -105,6 +105,12 @@
                     <span>编辑资料</span>
                   </div>
                 </el-dropdown-item>
+                <el-dropdown-item @click="router.push('/coupon-center')">
+                  <div class="edit-profile">
+                    <el-icon><Discount /></el-icon>
+                    <span>我的优惠券</span>
+                  </div>
+                </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">
                   退出登录
                 </el-dropdown-item>
@@ -222,7 +228,11 @@ import {
   Picture,
   Menu,
   Lock,
-  Setting
+  Setting,
+  Key,
+  Grid,
+  Discount
+  // Table,
 } from '@element-plus/icons-vue'
 import { useThemeStore } from '../stores/theme'
 import { useUserStore } from '../stores/user'
@@ -259,6 +269,8 @@ const menuStyle = computed(() => {
     activeTextColor: 'var(--el-color-primary)'
   }
 })
+
+
 
 const showUserInfoDialog = ref(false)
 const userInfo = ref({
@@ -390,7 +402,7 @@ const beforeAvatarUpload = (file) => {
 const menuConfig = [
   {
     path: '/admin/dashboard',
-    name: '仪表盘',
+    name: '数据统计',
     icon: 'Odometer',
     moduleCode: 'dashboard'  // 对应后端的模块code
   },
@@ -407,6 +419,12 @@ const menuConfig = [
     moduleCode: 'role'
   },
   {
+    path: '/admin/permissions',
+    name: '权限管理',
+    icon: 'Key',
+    moduleCode: 'permission'
+  },
+  {
     path: '/admin/categories',
     name: '分类管理',
     icon: 'Menu',
@@ -416,13 +434,19 @@ const menuConfig = [
     path: '/admin/dishes',
     name: '菜品管理',
     icon: 'Food',
-    moduleCode: 'product'  // 注意这里是 product 而不是 dishes
+    moduleCode: 'product' 
   },
   {
     path: '/admin/orders',
     name: '订单管理',
     icon: 'List',
     moduleCode: 'order'
+  },
+  {
+    path: '/admin/tables',
+    name: '餐桌管理',
+    icon: 'Grid',
+    moduleCode: 'table'
   },
   {
     path: '/admin/salary',
@@ -441,13 +465,35 @@ const menuConfig = [
     name: '图片管理',
     icon: 'Picture',
     moduleCode: 'banner'
+  },
+  {
+    path: '/admin/coupons',
+    name: '优惠券管理',
+    icon: 'Discount',
+    moduleCode: 'coupon'
   }
 ]
 
 // 过滤有权限的菜单
+// const menus = computed(() => {
+//   if (!userStore.permissions) return []
+  
+//   return menuConfig.filter(menu => {
+//     const module = userStore.permissions.find(
+//       m => m.code === menu.moduleCode
+//     )
+//     return module?.checked
+//   })
+// })
+
 const menus = computed(() => {
   if (!userStore.permissions) return []
-  
+
+  // ✅ 如果是管理员，直接返回所有菜单
+  if (userStore.roles.includes('admin')) {
+    return menuConfig
+  }
+
   return menuConfig.filter(menu => {
     const module = userStore.permissions.find(
       m => m.code === menu.moduleCode
@@ -455,6 +501,7 @@ const menus = computed(() => {
     return module?.checked
   })
 })
+
 
 // 处理菜单点击
 const handleMenuClick = (menu) => {
