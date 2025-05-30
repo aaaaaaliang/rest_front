@@ -112,6 +112,23 @@ export const API = {
     RECEIVE: '/api/coupon/receive',          // 领取优惠券
     SECKILL_RECEIVE: '/api/coupon/seckill/receive',  // 秒杀券领取
     USER_COUPONS: '/api/coupon/seckill'     // 获取用户优惠券列表
+  },
+  AI: {
+    CHAT_FIRST: '/api/ai/chat/first', // 首次发起AI聊天
+    CHAT_IN_SESSION: '/api/ai/chat/in-session', // 在已有会话中继续聊天
+    SESSION_LIST: '/api/ai/chat/session', // 获取会话列表
+    SESSION_DELETE: '/api/ai/chat/session', // 删除会话
+    SESSION_UPDATE: '/api/ai/chat/session', // 更新会话（重命名）
+    HISTORY: '/api/ai/chat/history', // 获取聊天历史
+    MODEL_CONFIG: '/api/ai-model' // 获取AI模型配置
+  },
+  CHAT: {
+    AGENT: '/api/chat/agent', // 客服发起会话
+    CUSTOMER: '/api/chat/customer', // 用户自动分配客服
+    WS: '/api/chat' // WebSocket 聊天（带 session_code）
+  },
+  LOG: {
+    SEARCH: '/api/log/es'
   }
 } 
 

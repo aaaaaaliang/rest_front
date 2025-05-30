@@ -15,6 +15,7 @@
         <el-menu-item index="/menu">点餐</el-menu-item>
         <el-menu-item index="/orders">我的订单</el-menu-item>
         <el-menu-item index="/coupon-center">领券中心</el-menu-item>
+        <el-menu-item index="/ai-chat">智能助手</el-menu-item>
       </el-menu>
       <div class="user-actions">
         <router-link to="/cart" class="cart-link">
@@ -65,6 +66,12 @@
                     <span>我的优惠券</span>
                   </div>
                 </el-dropdown-item>
+                <el-dropdown-item @click="router.push('/ai-chat')">
+                  <div class="edit-profile">
+                    <el-icon><ChatDotRound /></el-icon>
+                    <span>智能助手</span>
+                  </div>
+                </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">
                   退出登录
                 </el-dropdown-item>
@@ -108,7 +115,8 @@ import {
   ShoppingCart,
   UserFilled,
   User,
-  Discount
+  Discount,
+  ChatDotRound
 } from '@element-plus/icons-vue'
 import CustomerService from '../components/CustomerService.vue'
 import request from '../utils/request'

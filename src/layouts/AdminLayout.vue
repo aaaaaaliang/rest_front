@@ -231,7 +231,9 @@ import {
   Setting,
   Key,
   Grid,
-  Discount
+  Discount,
+  Cpu,
+  Document
   // Table,
 } from '@element-plus/icons-vue'
 import { useThemeStore } from '../stores/theme'
@@ -404,7 +406,7 @@ const menuConfig = [
     path: '/admin/dashboard',
     name: '数据统计',
     icon: 'Odometer',
-    moduleCode: 'dashboard'  // 对应后端的模块code
+    moduleCode: 'dashboard'
   },
   {
     path: '/admin/user',
@@ -428,13 +430,13 @@ const menuConfig = [
     path: '/admin/categories',
     name: '分类管理',
     icon: 'Menu',
-    moduleCode: 'category'  // 注意这里是 product 而不是 dishes
+    moduleCode: 'category'
   },
   {
     path: '/admin/dishes',
     name: '菜品管理',
     icon: 'Food',
-    moduleCode: 'product' 
+    moduleCode: 'product'
   },
   {
     path: '/admin/orders',
@@ -471,6 +473,18 @@ const menuConfig = [
     name: '优惠券管理',
     icon: 'Discount',
     moduleCode: 'coupon'
+  },
+  {
+    path: '/admin/ai-model',
+    name: 'AI管理',
+    icon: 'Cpu',
+    moduleCode: 'ai'
+  },
+  {
+    path: '/admin/logs',
+    name: '日志管理',
+    icon: 'Document',
+    moduleCode: 'log'
   }
 ]
 

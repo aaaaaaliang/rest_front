@@ -2,6 +2,8 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import { nextTick } from 'vue'
+import AIChat from '@/views/client/AIChat.vue'
+import LogManagement from '@/views/admin/LogManagement.vue'
 
 const routes = [
   {
@@ -123,6 +125,22 @@ const routes = [
         name: 'CouponManagement',
         component: () => import('../views/admin/CouponManagement.vue'),
         meta: { title: '优惠券管理' }
+      },
+      {
+        path: 'ai-model',
+        name: 'AIModelManagement',
+        component: () => import('../views/admin/AIModelManagement.vue'),
+        meta: { title: 'AI模型管理' }
+      },
+      {
+        path: 'logs',
+        name: 'LogManagement',
+        component: LogManagement,
+        meta: {
+          requiresAuth: true,
+          requiresAdmin: true,
+          title: '日志管理'
+        }
       }
     ]
   },
@@ -173,6 +191,15 @@ const routes = [
         meta: {
           title: '领券中心',
           requiresAuth: true
+        }
+      },
+      {
+        path: 'ai-chat',
+        name: 'AIChat',
+        component: AIChat,
+        meta: {
+          requiresAuth: true,
+          title: '智能助手'
         }
       }
     ]

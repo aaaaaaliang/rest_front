@@ -1,648 +1,303 @@
 <template>
-  <div class="customer-service">
-    <el-card class="chat-card">
-      <template #header>
-        <div class="header">
-          <span class="title">客服管理</span>
-          <div class="header-right">
-            <el-tag 
-              :type="isConnected ? 'success' : 'danger'" 
-              size="small" 
-              effect="plain"
-              class="status-tag"
-            >
-              {{ isConnected ? '已连接' : '未连接' }}
-            </el-tag>
-            <el-tag type="info" size="small">在线用户: 0</el-tag>
+  <div class="cs-container">
+    <!-- 左侧用户列表 -->
+    <div class="cs-user-list">
+      <div class="cs-list-header">
+        <el-input
+          v-model="search"
+          placeholder="搜索用户名/昵称"
+          @input="fetchUserList"
+          clearable
+          size="small"
+          prefix-icon="el-icon-search"
+        />
+      </div>
+      <el-scrollbar class="cs-scrollbar">
+        <div v-for="user in userList" :key="user.code"
+          :class="['cs-user-item', user.code === currentUser?.code ? 'active' : '']"
+          @click="selectUser(user)">
+          <el-avatar :size="36" icon="el-icon-user" style="margin-right: 10px;" />
+          <div class="cs-user-info">
+            <div class="cs-user-name">{{ user.real_name || user.username }}</div>
+            <div class="cs-user-desc">{{ user.nickname || user.phone }}</div>
           </div>
         </div>
-      </template>
-
-      <div class="message-container">
-        <div class="messages" ref="messageBox">
-          <div v-for="(msg, index) in messages" :key="index" 
-            :class="['message', msg.fromUser === userStore.user?.code ? 'message-right' : 'message-left']">
-            <div class="message-info">
-              <span class="sender">
-                {{ msg.fromUser === userStore.user?.code ? '客服' : msg.fromUser }}
-              </span>
-              <span class="time">{{ new Date(msg.timestamp).toLocaleTimeString() }}</span>
-            </div>
-            <div class="message-content">{{ msg.content }}</div>
-          </div>
-        </div>
-
-        <div class="input-area">
-          <div class="input-wrapper">
-            <el-input
-              v-model="inputMessage"
-              type="textarea"
-              :rows="4"
-              :disabled="!isConnected"
-              placeholder="请输入消息..."
-              @keyup.enter.prevent="sendMessage"
-              resize="none"
-            />
-            <el-button 
-              type="primary" 
-              :disabled="!isConnected"
-              @click="sendMessage"
-              class="send-button"
-            >
-              发送
-            </el-button>
-          </div>
+      </el-scrollbar>
+    </div>
+    <!-- 右侧聊天窗口 -->
+    <div class="cs-chat-area" v-if="currentUser">
+      <div class="cs-chat-header">
+        <el-avatar :size="36" icon="el-icon-user" />
+        <div class="cs-chat-title">
+          <div class="cs-chat-name">{{ currentUser.real_name || currentUser.username }}</div>
+          <div class="cs-chat-desc">{{ currentUser.nickname || currentUser.phone }}</div>
         </div>
       </div>
-    </el-card>
+      <el-scrollbar class="cs-chat-messages" ref="messageBox">
+        <div v-for="(msg, idx) in messages" :key="idx" :class="['cs-msg', msg.self ? 'self' : 'other']">
+          <div class="cs-msg-content">{{ msg.content }}</div>
+          <div class="cs-msg-time">{{ formatTime(msg.timestamp) }}</div>
+        </div>
+      </el-scrollbar>
+      <div class="cs-chat-input">
+        <el-input
+          v-model="inputMessage"
+          type="textarea"
+          :rows="2"
+          placeholder="请输入消息..."
+          @keyup.enter.prevent="sendMessage"
+        />
+        <el-button type="primary" @click="sendMessage" :disabled="!inputMessage.trim()" style="margin-left: 8px;">
+          发送
+        </el-button>
+      </div>
+    </div>
+    <div class="cs-chat-area cs-empty" v-else>
+      <el-empty description="请选择左侧用户开始聊天" />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useUserStore } from '@/stores/user'
+import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Position } from '@element-plus/icons-vue'
-import {API} from "../../config/api.js";
+import request from '@/utils/request'
+import { API } from '@/config/api'
 
-const userStore = useUserStore()
+const search = ref('')
+const userList = ref([])
+const currentUser = ref(null)
 const messages = ref([])
 const inputMessage = ref('')
-const isConnected = ref(false)
-const ws = ref(null)
 const messageBox = ref(null)
+let ws = null
 
-// 连接WebSocket
-// const connectWebSocket = () => {
-//   try {
-//     const wsUrl = API.WS.GET;  // ✅ 直接请求后端 8888 端口
-//     console.log('正在连接 WebSocket:', wsUrl);
-
-//     ws.value = new WebSocket(wsUrl);
-
-//     ws.value.onopen = () => {
-//   console.log('✅ WebSocket 连接成功');
-//   isConnected.value = true;
-
-//   // 发送身份验证消息
-//   const authMsg = {
-//     type: 'identify',
-//     role: 'service',
-//     user_code: userStore.user?.code
-//   };
-//   console.log('📨 发送身份验证消息:', authMsg);
-//   ws.value.send(JSON.stringify(authMsg));
-// };
-
-// // ws.value.onmessage = (event) => {
-// //   console.log('📩 收到原始消息:', event.data);
-
-// //   if (!event.data) {
-// //     console.warn('⚠️ 收到空消息');
-// //     return;
-// //   }
-
-// //   try {
-// //     const data = JSON.parse(event.data);
-// //     console.log('✅ 解析后的消息:', data);
-
-// //     if (!data.type) {
-// //       console.warn('⚠️ 消息缺少 `type` 字段:', data);
-// //       return;
-// //     }
-
-// //     switch (data.type) {
-// //       case 'chat':
-// //         // 处理聊天消息
-// //         if (data.from_user !== userStore.user?.code) {
-// //           messages.value.push({
-// //             content: data.content,
-// //             timestamp: data.timestamp,
-// //             fromUser: data.from_user
-// //           });
-// //           scrollToBottom();
-// //         }
-// //         break;
-
-// //       case 'system':
-// //         // 处理系统消息，可能是在线用户数等
-// //         console.log('🔔 系统消息:', data.content);
-// //         ElMessage.info(data.content);
-// //         break;
-
-// //       case 'update_online_users':
-// //         // 更新在线用户数
-// //         console.log('⚡ 更新在线用户数:', data.onlineCount);
-// //         // 更新在线用户显示
-// //         break;
-
-// //       case 'error':
-// //         console.error('❌ 错误消息:', data.content);
-// //         ElMessage.error(data.content);
-// //         break;
-
-// //       default:
-// //         console.warn('⚠️ 未知消息类型:', data.type);
-// //     }
-// //   } catch (error) {
-// //     console.error('❌ 消息解析失败:', error);
-// //     console.error('📜 原始消息内容:', event.data);
-// //   }
-// // };
-
-// ws.value.onmessage = (event) => {
-//   console.log('📩 收到原始消息:', event.data);
-
-//   if (!event.data) {
-//     console.warn('⚠️ 收到空消息');
-//     return;
-//   }
-
-//   try {
-//     const data = JSON.parse(event.data);
-//     console.log('✅ 解析后的消息:', data);
-
-//     if (!data.type) {
-//       console.warn('⚠️ 消息缺少 `type` 字段:', data);
-//       return;
-//     }
-
-//     switch (data.type) {
-//       case 'chat':
-//         // 处理聊天消息
-//         if (data.from_user !== userStore.user?.code) {
-//           messages.value.push({
-//             content: data.content,
-//             timestamp: data.timestamp,
-//             fromUser: data.from_user
-//           });
-//           scrollToBottom();
-//         }
-//         break;
-
-//       case 'system':
-//         // 处理系统消息，可能是在线用户数等
-//         console.log('🔔 系统消息:', data.content);
-//         ElMessage.info(data.content);
-//         break;
-
-//       case 'error':
-//         console.error('❌ 错误消息:', data.content);
-//         ElMessage.error(data.content);
-//         break;
-
-//       default:
-//         console.warn('⚠️ 未知消息类型:', data.type);
-//     }
-//   } catch (error) {
-//     console.error('❌ 消息解析失败:', error);
-//     console.error('📜 原始消息内容:', event.data);
-//   }
-// };
-
-
-//     ws.value.onmessage = (event) => {
-//       console.log('📩 收到原始消息:', event.data);
-
-//       if (!event.data) {
-//         console.warn('⚠️ 收到空消息');
-//         return;
-//       }
-
-//       try {
-//         const data = JSON.parse(event.data);
-//         console.log('✅ 解析后的消息:', data);
-
-//         if (!data.type) {
-//           console.warn('⚠️ 消息缺少 `type` 字段:', data);
-//           return;
-//         }
-
-//         switch (data.type) {
-//           case 'chat':
-//             if (data.from_user !== userStore.user?.code) {
-//               messages.value.push({
-//                 content: data.content,
-//                 timestamp: data.timestamp,
-//                 fromUser: data.from_user
-//               });
-//               scrollToBottom();
-//             }
-//             break;
-
-//           case 'system':
-//             console.log('🔔 系统消息:', data.content);
-//             ElMessage.info(data.content);
-//             break;
-
-//           case 'error':
-//             console.error('❌ 错误消息:', data.content);
-//             ElMessage.error(data.content);
-//             break;
-
-//           default:
-//             console.warn('⚠️ 未知消息类型:', data.type);
-//         }
-//       } catch (error) {
-//         console.error('❌ 消息解析失败:', error);
-//         console.error('📜 原始消息内容:', event.data);
-//       }
-//     };
-
-//     ws.value.onclose = (event) => {
-//       console.log('❌ WebSocket 连接关闭:', event.code, event.reason);
-//       isConnected.value = false;
-//     };
-
-//     ws.value.onerror = (error) => {
-//       console.error('❌ WebSocket 错误:', error);
-//       isConnected.value = false;
-//     };
-//   } catch (error) {
-//     console.error('❌ WebSocket 连接失败:', error);
-//   }
-// };
-
-// 连接WebSocket并发送身份验证信息
-const connectWebSocket = () => {
-  try {
-    const wsUrl = API.WS.GET;  // 使用后端提供的 WebSocket URL
-    console.log('正在连接 WebSocket:', wsUrl);
-
-    ws.value = new WebSocket(wsUrl);
-
-    ws.value.onopen = () => {
-      console.log('✅ WebSocket 连接成功');
-      isConnected.value = true;
-
-      // **发送身份验证消息**
-      const authMsg = {
-        type: 'identify',
-        role: 'service',  // 客服角色
-        user_code: userStore.user?.code  // 确保 user_code 正确
-      };
-      console.log('📨 发送身份验证消息:', authMsg);
-      ws.value.send(JSON.stringify(authMsg));
-    };
-
-    ws.value.onmessage = (event) => {
-      console.log('📩 收到原始消息:', event.data);
-
-      if (!event.data) {
-        console.warn('⚠️ 收到空消息');
-        return;
-      }
-
-      try {
-        const data = JSON.parse(event.data);
-        console.log('✅ 解析后的消息:', data);
-
-        if (!data.type) {
-          console.warn('⚠️ 消息缺少 `type` 字段:', data);
-          return;
-        }
-
-        switch (data.type) {
-          case 'chat':
-            if (data.from_user !== userStore.user?.code) {
-              messages.value.push({
-                content: data.content,
-                timestamp: data.timestamp,
-                fromUser: data.from_user
-              });
-              scrollToBottom();
-            }
-            break;
-
-          case 'system':
-            console.log('🔔 系统消息:', data.content);
-            ElMessage.info(data.content);
-            break;
-
-          case 'error':
-            console.error('❌ 错误消息:', data.content);
-            ElMessage.error(data.content);
-            break;
-
-          default:
-            console.warn('⚠️ 未知消息类型:', data.type);
-        }
-      } catch (error) {
-        console.error('❌ 消息解析失败:', error);
-        console.error('📜 原始消息内容:', event.data);
-      }
-    };
-  } catch (error) {
-    console.error('❌ WebSocket 连接失败:', error);
+// 拉取用户列表（index/size 通过 query 拼接，GET 请求）
+const fetchUserList = async () => {
+  const params = new URLSearchParams({
+    index: 1,
+    size: 50
+  })
+  if (search.value) {
+    params.append('username', search.value)
   }
-};
+  const res = await request(`${API.USER.LIST}?${params.toString()}`, {
+    method: 'GET'
+  })
+  if (res.data && res.data.code === 200) {
+    userList.value = res.data.data || []
+  }
+}
+onMounted(fetchUserList)
+
+// 选择用户并建立会话
+const selectUser = async (user) => {
+  if (currentUser.value && user.code === currentUser.value.code) return
+  currentUser.value = user
+  messages.value = []
+  inputMessage.value = ''
+  if (ws) {
+    ws.close()
+    ws = null
+  }
+  // 发起会话
+  const res = await request(API.CHAT.AGENT, {
+    method: 'GET',
+    data: { customer_code: user.code }
+  })
+  if (res.data && res.data.code === 200) {
+    const sessionCode = res.data.data.session_code
+    connectWebSocket(sessionCode)
+  } else {
+    ElMessage.error(res.data?.message || '会话建立失败')
+  }
+}
+
+// 建立 WebSocket 连接
+const connectWebSocket = (sessionCode) => {
+  const wsUrl = `${API.CHAT.WS}?session_code=${sessionCode}&user_type=agent`
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${wsUrl}`)
+  ws.onopen = () => {}
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data)
+      messages.value.push({
+        content: msg.content,
+        timestamp: msg.timestamp || Date.now(),
+        self: msg.sender_type === 'agent'
+      })
+      scrollToBottom()
+    } catch (e) {}
+  }
+  ws.onclose = () => {}
+  ws.onerror = () => {
+    ElMessage.error('WebSocket 连接异常')
+  }
+}
 
 // 发送消息
 const sendMessage = () => {
-  if (!inputMessage.value.trim() || !isConnected.value) return
-  
-  try {
-    const message = {
-      type: 'chat',
-      content: inputMessage.value.trim(),
-      from_user: userStore.user?.code,
-      timestamp: Date.now()
-    }
-    
-    // 先添加到本地消息列表，确保立即显示
-    messages.value.push({
-      content: message.content,
-      timestamp: message.timestamp,
-      fromUser: message.from_user
-    })
-    
-    // 清空输入框并滚动到底部
-    inputMessage.value = ''
-    scrollToBottom()
-    
-    // 发送到服务器
-    ws.value.send(JSON.stringify(message))
-  } catch (error) {
-    // 如果发送失败，从消息列表中移除最后一条消息
-    messages.value.pop()
-    ElMessage.error('发送失败')
+  if (!inputMessage.value.trim() || !ws) return
+  const msg = {
+    session_code: '', // 后端可自动补全
+    content: inputMessage.value.trim(),
+    sender_type: 'agent'
   }
+  ws.send(JSON.stringify(msg))
+  messages.value.push({
+    content: inputMessage.value.trim(),
+    timestamp: Date.now(),
+    self: true
+  })
+  inputMessage.value = ''
+  scrollToBottom()
+}
+
+// 格式化时间
+const formatTime = (ts) => {
+  const d = new Date(ts)
+  return d.toLocaleTimeString()
 }
 
 // 滚动到底部
 const scrollToBottom = () => {
-  if (messageBox.value) {
-    messageBox.value.scrollTop = messageBox.value.scrollHeight
-  }
+  nextTick(() => {
+    if (messageBox.value) {
+      messageBox.value.setScrollTop(99999)
+    }
+  })
 }
 
-onMounted(() => {
-  connectWebSocket()
-})
-
 onBeforeUnmount(() => {
-  if (ws.value) {
-    ws.value.close()
-  }
+  if (ws) ws.close()
 })
 </script>
 
 <style scoped>
-.customer-service {
-  padding: 20px;
-  height: calc(100vh - 120px);
+.cs-container {
+  display: flex;
+  height: 80vh;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px #eee;
+}
+.cs-user-list {
+  width: 260px;
+  border-right: 1px solid #f0f0f0;
+  background: #fafbfc;
   display: flex;
   flex-direction: column;
 }
-
-.chat-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--el-bg-color);
+.cs-list-header {
+  padding: 16px 12px 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
 }
-
-.chat-card :deep(.el-card__body) {
+.cs-scrollbar {
+  flex: 1;
+  padding: 0 0 8px 0;
+}
+.cs-user-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f6f6f6;
+  transition: background 0.2s;
+}
+.cs-user-item.active, .cs-user-item:hover {
+  background: #e6f7ff;
+}
+.cs-user-info {
+  flex: 1;
+  min-width: 0;
+}
+.cs-user-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #222;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cs-user-desc {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cs-chat-area {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0;
-  min-height: 0;
+  background: #fff;
 }
-
-.chat-card :deep(.el-card__header) {
-  background-color: var(--el-bg-color);
-  border-bottom-color: var(--el-border-color-light);
-  padding: 12px 20px;
-}
-
-.header {
+.cs-chat-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  padding: 18px 24px 12px 24px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
 }
-
-.title {
+.cs-chat-title {
+  margin-left: 12px;
+}
+.cs-chat-name {
   font-size: 16px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: #222;
 }
-
-.header-right {
+.cs-chat-desc {
+  font-size: 12px;
+  color: #888;
+}
+.cs-chat-messages {
+  flex: 1;
+  padding: 18px 24px;
+  background: #f8fafd;
+  overflow-y: auto;
+}
+.cs-msg {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.cs-msg.self {
+  align-items: flex-end;
+}
+.cs-msg-content {
+  background: #409eff;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 16px;
+  font-size: 15px;
+  max-width: 60%;
+  word-break: break-all;
+}
+.cs-msg.other .cs-msg-content {
+  background: #f4f4f5;
+  color: #222;
+}
+.cs-msg-time {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 2px;
+}
+.cs-chat-input {
+  display: flex;
+  align-items: flex-end;
+  padding: 16px 24px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+}
+.cs-empty {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.status-tag {
-  margin-right: 8px;
-}
-
-.message-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background-color: var(--el-bg-color-page);
-}
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 20px 10px;
-  min-height: 0;
-}
-
-.message {
-  margin-bottom: 24px;
-  max-width: 75%;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.message-left {
-  margin-right: auto;
-}
-
-.message-right {
-  margin-left: auto;
-}
-
-.message-info {
-  margin-bottom: 6px;
-  font-size: 13px;
-  padding: 0 4px;
-}
-
-.message-info .sender {
-  margin-right: 8px;
-  font-weight: 500;
-}
-
-.message-left .message-info .sender {
-  color: var(--el-text-color-regular);
-}
-
-.message-right .message-info .sender {
-  color: var(--el-color-primary);
-}
-
-.message-info .time {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-
-.message-content {
-  padding: 12px 16px;
-  border-radius: 12px;
-  word-break: break-all;
-  line-height: 1.6;
-  font-size: 14px;
-  position: relative;
-  transition: all 0.3s;
-}
-
-.message-left .message-content {
-  background-color: var(--el-fill-color-blank);
-  color: var(--el-text-color-primary);
-  border-top-left-radius: 4px;
-  box-shadow: 0 2px 8px var(--el-box-shadow);
-}
-
-.message-right .message-content {
-  background-color: var(--el-color-primary);
-  color: white;
-  border-top-right-radius: 4px;
-  box-shadow: 0 2px 8px var(--el-color-primary-light-8);
-}
-
-.input-area {
-  padding: 16px 20px;
-  background-color: var(--el-fill-color-blank);
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-
-.input-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.input-area .el-input {
-  width: 100%;
-}
-
-.input-area .el-input :deep(.el-textarea__inner) {
-  background-color: var(--el-fill-color);
-  color: var(--el-text-color-primary);
-  border: 1px solid var(--el-border-color);
-  resize: none;
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 14px;
-  line-height: 1.6;
-  height: 100px;
-}
-
-.input-area .el-input :deep(.el-textarea__inner):hover {
-  border-color: var(--el-border-color-hover);
-}
-
-.input-area .el-input :deep(.el-textarea__inner):focus {
-  border-color: var(--el-color-primary);
-  box-shadow: 0 0 0 1px var(--el-color-primary-light-8);
-}
-
-.send-button {
-  width: 100%;
-  height: 40px;
-  background-color: var(--el-color-primary);
-  border-color: var(--el-color-primary);
-  color: white;
-}
-
-.send-button:hover:not(:disabled) {
-  background-color: var(--el-color-primary-light-3);
-  border-color: var(--el-color-primary-light-3);
-  transform: translateY(-1px);
-}
-
-.send-button:disabled {
-  background-color: var(--el-button-disabled-bg-color);
-  border-color: var(--el-button-disabled-border-color);
-  color: var(--el-button-disabled-text-color);
-}
-
-.send-icon {
-  font-size: 20px;
-}
-
-/* 滚动条样式优化 */
-.messages::-webkit-scrollbar {
-  width: 4px;
-}
-
-.messages::-webkit-scrollbar-thumb {
-  background: #c0c4cc;
-  border-radius: 2px;
-}
-
-.messages::-webkit-scrollbar-thumb:hover {
-  background: #909399;
-}
-
-.messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* 适配暗色主题 */
-html.dark {
-  .chat-card,
-  .chat-card :deep(.el-card__header) {
-    background-color: var(--el-bg-color);
-    border-color: var(--el-border-color-light);
-  }
-  
-  .title {
-    color: var(--el-text-color-primary);
-  }
-  
-  .message-container {
-    background-color: var(--el-bg-color);
-  }
-  
-  .message-left .message-content {
-    background-color: var(--el-fill-color);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
-  
-  .input-area {
-    background-color: var(--el-fill-color-blank);
-    border-top-color: var(--el-border-color-light);
-  }
-
-  .input-area .el-input :deep(.el-textarea__inner) {
-    background-color: var(--el-fill-color-darker);
-    border-color: var(--el-border-color);
-    
-    &:hover {
-      border-color: var(--el-border-color-hover);
-    }
-    
-    &:focus {
-      border-color: var(--el-color-primary);
-      box-shadow: 0 0 0 1px var(--el-color-primary-light-8);
-    }
-  }
-
-  .send-button {
-    background: var(--el-color-primary);
-    border-color: var(--el-color-primary);
-    color: white;
-  }
+  justify-content: center;
+  background: #fff;
 }
 </style>
